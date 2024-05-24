@@ -3,6 +3,7 @@ using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils
 using ScikitLearn: @sk_import
 @sk_import ensemble: RandomForestRegressor
 @sk_import model_selection: StratifiedKFold
+cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
 folder_path = "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data"
 Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
 MACCS_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\MACCS keys.txt")
@@ -126,7 +127,6 @@ end
 for i = 1:374
     #Locating the file
     current_file = joinpath("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
-    println(i)
     #Getting the SMILES and retention times
     rt_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "rtdata_canonical_success.tsv"],"_"))
     data_compounds = CSV.read(rt_path, DataFrame)
@@ -210,7 +210,7 @@ X = [MACCS PubChem_fps]
 
 X = (X[indices_RPLC,:])
 
-y = Float64.(Final_table_unique[:,7][indices_RPLC])
+y = Float64.(Final_table_unique[:,end][indices_RPLC])
 
 shuffle_indices = shuffle(collect(1:length(y)))
 
@@ -218,147 +218,5 @@ X = X[shuffle_indices,:]
 
 y = y[shuffle_indices]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, stratify=y)
+model,test_final = partition(eachindex(y), 0.9, rng=42)
 
-#######################
-#Manual Hyperparameter optimisation for ScikitLearn RF
-n_estimators_t = 15
-
-criterion = "squared_error"
-
-max_depth_t = [200]
-
-min_samples_split_t = [2]
-
-min_samples_leaf_t = [1]
-
-random_state = 42
-
-f_name = "Random forest RPLC Stratification with strings"
-
-df_results_3 = DataFrame(n_estimators = Int[], min_samples_split = Int[], min_samples_leaf = Int[], train_score = Float64[], test_score = Float64[])
-
-df_results_3 = CSV.read("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", DataFrame)
-
-
-
-#StratifiedKFold
-bins = 10
-k = 3
-classes = custom_binning(y[model], bins)
-
-histogram(classes, xticks = (1:bins),
-dpi = 300,
-label = false,
-title = "Binning of retention factors for Stratification")
-
-train, test = Stratifiedcv(X[model,:], classes, k)
-
-for n_estimators in n_estimators_t
-    @show n_estimators
-        for min_samples_split in min_samples_split_t
-            @show min_samples_split
-            for min_samples_leaf in min_samples_leaf_t
-                @show min_samples_leaf
-                scores_train = zeros(k)
-                scores_test = zeros(k)
-                for fold = collect(1:k)
-                    #train_fold = kf.train_indices[fold]
-                    #val_fold = kf.val_indices[fold]
-
-                    train_fold = train[fold]
-                    val_fold = test[fold]
-
-                    rf_regressor = RandomForestRegressor(n_estimators = n_estimators, criterion = criterion, 
-                                                        min_samples_split = min_samples_split, min_samples_leaf = min_samples_leaf, random_state = random_state, n_jobs = -1)
-
-                    ScikitLearn.fit!(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
-
-                    scores_train[fold] = ScikitLearn.score(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
-                    scores_test[fold] = ScikitLearn.score(rf_regressor, X[model, :][val_fold,:], y[model][val_fold])
-                end
-                score_train_cv = mean(scores_train)
-                score_test_cv = mean(scores_test)
-                @show score_train_cv
-                @show score_test_cv
-                push!(df_results_3, [n_estimators, min_samples_split, min_samples_leaf, score_train_cv, score_test_cv])
-            end
-    end
-end
-
-CSV.write("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", df_results_3)
-
-df_results_3
-
-scatter(df_results_3[8:end,1],df_results_3[8:end,end-1], ylims = (0,1),
-xlabel = "number of trees",
-ylabel = "CV 3 score",
-label ="test",
-title = "RPLC RF Sratified CV 3 scores",
-dpi = 300)
-scatter!(df_results_3[8:end,1],df_results_3[8:end,end],
-label = "train")
-
-#Getting the model for the test data using the best hyperparameters
-ind_best = argmax(df_results_3.test_score)
-
-#Using the hyperparameter data
-rf_regressor = RandomForestRegressor(n_estimators = df_results_3.n_estimators[ind_best], criterion = "squared_error", max_depth = df_results_3.max_depth[ind_best], 
-                                     min_samples_split = df_results_3.min_samples_split[ind_best], min_samples_leaf = 1, random_state = 42, n_jobs = -1)
-
-#Manually
-rf_regressor = RandomForestRegressor(n_estimators = 10, criterion = "squared_error", 
-                                     min_samples_split = 2, min_samples_leaf = 1, random_state = 42, n_jobs = -1)
-
-ScikitLearn.fit!(rf_regressor, X[model,:], y[model])
-
-y_hat_train = ScikitLearn.predict(rf_regressor,X[model,:])
-y_hat_test = ScikitLearn.predict(rf_regressor,X[test_final,:])
-
-score_train = ScikitLearn.score(rf_regressor, X[model,:], y[model])
-score_test = ScikitLearn.score(rf_regressor, X[test_final,:], y[test_final])
-
-scatter(y[model], y_hat_train, label = "train = $(round(score_train, digits= 2))", xlims = (0,1), ylims = (0,1), dpi = 300)
-scatter!(y[test_final],y_hat_test, label = "test = $(round(score_test, digits= 2))")
-
-importance = rf_regressor.feature_importances_
-
-sorted_importance = sortperm(importance, rev = true)
-
-labels = All_keys[sorted_importance]
-
-bar(labels[1:15],sort(importance, rev = true)[1:15],
-xrotation=40, 
-dpi = 300,
-title = "RPLC important variables", 
-bottom_margin = 8Plots.mm,
-legend = false)
-
-#leverage
-
-leverage = calculate_leverage(X[model,:], X[test_final,:])
-
-histogram(leverage, xlims = (0,0.35), label = false, dpi = 300,
-title = "Leverage calculation Train vs Test set")
-
-percentile_95 = quantile(leverage, 0.95)
-
-vline!([percentile_95], label="95th Percentile", color="red", linestyle=:dash)
-
-#Applicability domain
-indices_inside_AD = findall(x-> x <percentile_95, leverage)
-indices_outside_AD = findall(x-> x >=percentile_95, leverage)
-
-scatter(y[model], y_hat_train, label = "train = $(round(score_train, digits= 2))", xlims = (0,1), ylims = (0,1), dpi = 300)
-scatter!(y[test_final][indices_inside_AD],y_hat_test[indices_inside_AD], label = "test = $(round(score_test, digits= 2))")
-scatter!(y[test_final][indices_outside_AD],y_hat_test[indices_outside_AD], label = "Outside AD test", shape = :star)
-
-
-
-
-cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
-savefig("k means mobile phase.png")
-cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
-
-
-rmse(y_hat_test,y[test_final])
