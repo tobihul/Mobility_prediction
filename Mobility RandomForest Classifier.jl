@@ -1,8 +1,9 @@
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots, MultivariateStats
-using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils
+using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils, Clustering
 using ScikitLearn: @sk_import
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
+@sk_import model_selection: train_test_split
 folder_path = "C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data"
 Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
 MACCS_keys = readlines( "C:\\Users\\uqthulle\\Documents\\MACCS keys.txt")
@@ -210,21 +211,50 @@ p_b = Final_table_unique[indices_RPLC,end]./100
 
 #Shuffling data and creating classes
 Random.seed!(42)
-
 X = [MACCS PubChem_fps]
 
 X = (X[indices_RPLC,:])
 
+x = Float64.(vec(Final_table_unique[indices_RPLC,end]))
+y = Float64.(Matrix(Final_table_unique[indices_RPLC,end-1:end]))
+# Set the number of clusters
+k = 3
+
+# Perform k-means clustering
+result = kmeans(x', k)
+
+# Extract the results
+clusters = result.assignments  # Cluster assignments for each data point
+centroids = result.centers     # Centroids of the clusters
+
+
+indices_1 = findall(x-> x == 1, clusters)
+indices_2 = findall(x-> x == 2, clusters)
+indices_3 = findall(x-> x == 3, clusters)
+histogram(Final_table_unique[indices_RPLC,end][indices_1], xlims = (0,100))
+histogram!(Final_table_unique[indices_RPLC,end][indices_2], xlims = (0,100))
+histogram!(Final_table_unique[indices_RPLC,end][indices_3], xlims = (0,100))
+# Print the results
+println("Cluster assignments: ", clusters)
+println("Centroids: ", centroids)
+y = clusters
+# Visualize the results
+scatter(X[:, 1], X[:, 2], group=clusters, legend=false)
+scatter!(centroids[:, 1], centroids[:, 2], ms=2, mc=:black)
 y = []
 for i in eachindex(Retention_factors)
-    if Retention_factors[i] >= 0.666666 
+    if Retention_factors[i] >= 0.5 
         push!(y, "Non-mobile")
-    elseif Retention_factors[i] <= 0.3333333
+    elseif Retention_factors[i] <= 0.2
         push!(y, "Very mobile")
     else 
         push!(y, "Mobile")
     end
 end
+
+sum(y.=="Mobile")
+sum(y.=="Non-mobile")
+sum(y.=="Very mobile")
 
 shuffle_indices = shuffle(collect(1:length(y)))
 
@@ -232,7 +262,8 @@ X = X[shuffle_indices,:]
 
 y = y[shuffle_indices]
 
-model,test_final = partition(eachindex(y), 0.9, rng=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, stratify=y)
+
 
 #Manual Hyperparameter optimisation for ScikitLearn RF
 n_estimators_t = 100
@@ -253,7 +284,7 @@ df_results_3 = CSV.read("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", DataFram
 
 rf_cl = RandomForestClassifier(n_estimators = 10, random_state = 42)
 
-ScikitLearn.fit!(rf_cl, X[model,:], y[model])
+ScikitLearn.fit!(rf_cl, X_train, y_train)
 
 y_hat_train = ScikitLearn.predict(rf_cl,X[model,:])
 y_hat_test = ScikitLearn.predict(rf_cl,X[test_final,:])
@@ -280,19 +311,19 @@ legend = false)
 # Get predicted probabilities for test set
 y_prob_test = ScikitLearn.predict_proba(rf_cl, X[test_final,:])
 
-real = y[test_final]
+real = y_test
 pred = y_hat_test
+pred = real
 
-sum(real .== "Mobile")
-sum(real .== "Non-mobile")
-sum(real .== "Very mobile")
+sum(real.=="Mobile")
+sum(real.=="Very mobile")
+sum(real.=="Non-mobile")
 threshold = collect(0:0.01:1)
 
 num_classes = 3
 
 TPRs = zeros(num_classes, length(threshold))
 FPRs = zeros(num_classes, length(threshold))
-y_hat_test
 for c in 1:num_classes
     for j in eachindex(threshold)
         TP, FP, TN, FN = 0, 0, 0, 0
@@ -312,13 +343,11 @@ for c in 1:num_classes
             end
         end
         TPRs[c, j] = TP / (TP + FN)
-        FPRs[c, j] = FP / (FP + TN)
+        FPRs[c, j] = FP / (FP + TP)
     end
 end
-
+FPRs
 # Plot ROC curves for each class
-mean_TPR = mean(TPRs, dims = 1)
-mean_FPR = mean(FPRs, dims = 1)
 scatter(FPRs[1,:], TPRs[1,:],
 title = "ROC curve even split %B mobile phase",
 xlabel = "FPR", ylabel = "TPR", 
@@ -326,9 +355,8 @@ label = "Mobile",
 dpi = 300)
 scatter!(FPRs[2,:], TPRs[2,:], label = "Non-mobile")
 scatter!(FPRs[3,:], TPRs[3,:], label = "Very mobile")
-scatter!(mean_FPR[1,:], mean_TPR[1,:], label = "Mean")
 plot!(threshold, threshold, linestyle = :dash, label = false)
 
 rf_cl.classes_
 
-savefig("C:\\Users\\uqthulle\\Documents\\Plots\\ROC curve evel split B mobile phase.png")
+savefig("C:\\Users\\uqthulle\\Documents\\Plots\\k means mobile phase split.png")

@@ -3,6 +3,7 @@ using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils
 using ScikitLearn: @sk_import
 @sk_import ensemble: RandomForestRegressor
 @sk_import model_selection: StratifiedKFold
+cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
 folder_path = "C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data"
 Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
 MACCS_keys = readlines( "C:\\Users\\uqthulle\\Documents\\MACCS keys.txt")
@@ -221,19 +222,26 @@ y = y[shuffle_indices]
 model,test_final = partition(eachindex(y), 0.9, rng=42)
 
 #Manual Hyperparameter optimisation for ScikitLearn RF
-n_estimators_t = [10,25,50]
+n_estimators_t = [10]
 
 criterion = "squared_error"
 
-min_samples_split_t = [2]
+min_samples_split_t = [2,4,6,8]
 
-min_samples_leaf_t = [1]
+min_samples_leaf_t = [1,2,4,6]
+
+max_features_t = [1, "sqrt", "log2"]
+
+max_depth_t = [100, 200]
 
 random_state = 42
 
 f_name = "Random forest RPLC mobile phase regression"
 
-df_results_3 = DataFrame(n_estimators = Int[], min_samples_split = Int[], min_samples_leaf = Int[], train_score = Float64[], test_score = Float64[])
+df_results_3 = DataFrame(n_estimators = Int[], min_samples_split = Int[], min_samples_leaf = Int[], 
+                         max_depth = Int[], max_features = Any[], train_score = Float64[], test_score = Float64[])
+
+cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents")
 
 df_results_3 = CSV.read("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", DataFrame)
 
@@ -255,43 +263,56 @@ for n_estimators in n_estimators_t
             @show min_samples_split
             for min_samples_leaf in min_samples_leaf_t
                 @show min_samples_leaf
-                scores_train = zeros(k)
-                scores_test = zeros(k)
-                for fold = collect(1:k)
-                    #train_fold = kf.train_indices[fold]
-                    #val_fold = kf.val_indices[fold]
+                for max_depth in max_depth_t
+                    @show max_depth
+                    for max_features in max_features_t
+                        @show max_features
 
-                    train_fold = train[fold]
-                    val_fold = test[fold]
+                        scores_train = zeros(k)
+                        scores_test = zeros(k)
+                        for fold = collect(1:k)
+                            #train_fold = kf.train_indices[fold]
+                            #val_fold = kf.val_indices[fold]
 
-                    rf_regressor = RandomForestRegressor(n_estimators = n_estimators, criterion = criterion, 
-                                                        min_samples_split = min_samples_split, min_samples_leaf = min_samples_leaf, random_state = random_state, n_jobs = -1)
+                            train_fold = train[fold]
+                            val_fold = test[fold]
 
-                    ScikitLearn.fit!(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
+                            rf_regressor = RandomForestRegressor(n_estimators = n_estimators, criterion = criterion, 
+                                                                min_samples_split = min_samples_split, min_samples_leaf = min_samples_leaf, 
+                                                                random_state = random_state, n_jobs = -1, max_features = max_features, max_depth = max_depth)
 
-                    scores_train[fold] = ScikitLearn.score(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
-                    scores_test[fold] = ScikitLearn.score(rf_regressor, X[model, :][val_fold,:], y[model][val_fold])
-                end
-                score_train_cv = mean(scores_train)
-                score_test_cv = mean(scores_test)
-                @show score_train_cv
-                @show score_test_cv
-                push!(df_results_3, [n_estimators, min_samples_split, min_samples_leaf, score_train_cv, score_test_cv])
+                            ScikitLearn.fit!(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
+
+                            scores_train[fold] = ScikitLearn.score(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
+                            scores_test[fold] = ScikitLearn.score(rf_regressor, X[model, :][val_fold,:], y[model][val_fold])
+                        end
+                        score_train_cv = mean(scores_train)
+                        score_test_cv = mean(scores_test)
+                        @show score_train_cv
+                        @show score_test_cv
+                        push!(df_results_3, [n_estimators, min_samples_split, min_samples_leaf, max_depth, max_features, score_train_cv, score_test_cv])
+                    end
             end
+        end
     end
 end
 
-CSV.write("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", df_results_3)
+CSV.write("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\$f_name.csv ", df_results_3)
 
 df_results_3
+unique_x = unique(df_results_3.max_features)
+x_map = Dict{Any, String}(unique_x .=> string.(unique_x))
+df_results_3.x_map = [x_map[val] for val in df_results_3.max_features]
 
-scatter(df_results_3[:,1],df_results_3[:,end-1], ylims = (0,1),
-xlabel = "number of trees",
+# Convert the new x variable to categorical type
+df.x_str = categorical(df.x_str)
+scatter(df_results_3[:,4],df_results_3.test_score, ylims = (0,1),
+xlabel = "min samples per leaf",
 ylabel = "CV 3 score",
 label ="test",
 title = "RPLC RF Sratified CV 3 scores",
 dpi = 300)
-scatter!(df_results_3[8:end,1],df_results_3[8:end,end],
+scatter!(df_results_3[:,4],df_results_3.train_score,
 label = "train")
 
 #Getting the model for the test data using the best hyperparameters

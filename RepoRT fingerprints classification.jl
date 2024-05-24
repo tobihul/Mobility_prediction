@@ -1,7 +1,16 @@
-using CSV, Statistics, DataFrames, StatsPlots, MultivariateStats
-using GLM, TypedTables, LinearAlgebra
-folder_path = "C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data"
+using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots, MultivariateStats
+using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils
+using ScikitLearn: @sk_import
+@sk_import ensemble: RandomForestRegressor
+@sk_import model_selection: StratifiedKFold
+@sk_import model_selection: train_test_split
+cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
+folder_path = "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data"
 Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
+MACCS_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\MACCS keys.txt")
+PubChem_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\PubChem keys.txt")
+All_keys =  [MACCS_keys ;PubChem_keys]
+All_keys_y = [MACCS_keys ;PubChem_keys]
 function interpolate_B_modifier(time::Float64, gradient::DataFrame)
     times = gradient[:,1]./run_time
     idx = searchsortedlast(times, time)
@@ -17,10 +26,108 @@ function interpolate_B_modifier(time::Float64, gradient::DataFrame)
         return B1 + (B2 - B1) * (time - t1) / (t2 - t1)
     end
 end
+function calculate_leverage(X,x)
+    leverage = zeros(length(x[:,1]))
+    b = pinv(X'*X)
+    for i = 1:length(x[:,1])
+        leverage[i] = (x[i,:])' * b * x[i,:] 
+    end
+    return leverage
+end
+function remove_overlapping(Results_table)
+
+    # Separate entries with RP and HILIC modes
+    rp_Inchikey = Results_table[Results_table.LC_mode .== "RP", :].Inchikey
+    hilic_Inchikey = Results_table[Results_table.LC_mode .== "HILIC", :].Inchikey
+
+    # Find the intersection of CIDss for both modes
+    common_Inchikey = intersect(rp_Inchikey, hilic_Inchikey)
+
+    #Removing the ones that have been separated by both as we already have them
+    condition = in.(Results_table.Inchikey, Ref(common_Inchikey))
+    Final_table_unique = Results_table[.!condition, :]
+
+    return Final_table_unique
+end
+function remove_missing_and_outliers(Results_unique)
+    #This removes rows that have missing retention factors due to no gradient data or other 
+    valuess = Results_unique.Retention_factors
+    indexes = Int[]
+    for i = 1:length(valuess)
+        if !ismissing(valuess[i]) && typeof(valuess[i]) == Float64
+            push!(indexes, i)
+        end
+    end
+    indexes
+    Results_unique = Results_unique[indexes,:]
+
+    #This removes outliers with high retention factor but low %B
+    rtfs = Results_unique[:,end-1]
+    pmbph = Results_unique[:,end]
+    indexes = Int[]
+    for i = 1:length(rtfs)
+        if rtfs[i] > 0.65 && pmbph[i] < 12.5
+            continue
+        else
+            push!(indexes, i)
+        end
+    end
+    indexes
+    Results_unique = Results_unique[indexes,:]
+    return Results_unique
+end
+function format_fingerprints(Final_table_unique)
+    #First we get MACCS
+    MACCS = Int.(zeros(length(Final_table_unique[:,2]),166))
+    for i = 1:length(Final_table_unique[:,3])
+        string_bits = Final_table_unique[i,3]
+        vectorized_bits = parse.(Int, split(string_bits, ","))
+        for v in vectorized_bits
+            MACCS[i,v] = 1
+        end
+    end
+    #Now PubChem FPs
+    Pubchem_fps = Int.(zeros(length(Final_table_unique[:,4]),881))
+    for i = 1:length(Final_table_unique[:,4])
+        string_bits = Final_table_unique[i,4]
+        vectorized_bits = parse.(Int, split(string_bits, ","))
+        for v in vectorized_bits
+            Pubchem_fps[i,v] = 1
+        end
+    end
+    return MACCS, Pubchem_fps
+end
+function custom_binning(y, num_bins)
+    min_val = minimum(y)
+    max_val = maximum(y)
+    bin_width = (max_val - min_val) / num_bins
+    bins = Array{Int}(undef, length(y))
+    
+    for i in 1:length(y)
+        bin_index = ceil(Int, (y[i] - min_val) / bin_width)
+        bins[i] = min(bin_index, num_bins)
+    end
+    
+    return bins
+end
+function Stratifiedcv(X, groups, n_folds)
+    # Initialize StratifiedKFold
+    skf = StratifiedKFold(n_splits=n_folds)
+
+    # Initialize variables to store indices for each fold
+    train_indices = Vector{Vector{Int}}(undef, n_folds)
+    test_indices = Vector{Vector{Int}}(undef, n_folds)
+
+    # Iterate over the splits and store indices for each fold
+    for (i, (train_idx, test_idx)) in enumerate(skf.split(X, groups))
+        train_indices[i] = train_idx .+ 1  # Adjust for 1-based indexing
+        test_indices[i] = test_idx .+ 1  # Adjust for 1-based indexing
+    end
+    return train_indices, test_indices
+end
 for i = 1:374
     #Locating the file
-    current_file = joinpath("C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
-    println(i)
+    current_file = joinpath("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
     #Getting the SMILES and retention times
     rt_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "rtdata_canonical_success.tsv"],"_"))
     data_compounds = CSV.read(rt_path, DataFrame)
@@ -33,16 +140,15 @@ for i = 1:374
      local retention_factors
      Modifier = []
      try 
-         run_time = gradient[end,1]
-         retention_factors = RT./run_time
-         for rtfs in retention_factors
+        run_time = gradient[end,1]
+        retention_factors = RT./run_time
+        for rtfs in retention_factors
             push!(Modifier, interpolate_B_modifier(rtfs, gradient))
-         end
+        end
      catch
          retention_factors = repeat(["Not gradient info"], length(RT))
          Modifier = repeat(["Not gradient info"], length(RT))
      end
-
     #Getting the MACCS
     MACCS_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "fingerprints_maccs_canonical_success.tsv"],"_"))
     MACCS_info = CSV.read(MACCS_path, DataFrame)
@@ -82,53 +188,21 @@ for i = 1:374
     Final_table = vcat(Final_table, current_table)
 end
 
-# Separate entries with RP and HILIC modes
-rp_Inchikey = Final_table[Final_table.LC_mode .== "RP", :].Inchikey
-hilic_Inchikey = Final_table[Final_table.LC_mode .== "HILIC", :].Inchikey
+Final_table
 
-# Find the intersection of CIDss for both modes
-common_Inchikey = intersect(rp_Inchikey, hilic_Inchikey)
+#Removing compounds that occur both in RPLC and HILIC 
+Final_table_unique = remove_overlapping(Final_table)
 
-#Removing the ones that have been separated by both as we already have them
-condition = in.(Final_table.Inchikey, Ref(common_Inchikey))
-Final_table_unique = Final_table[.!condition, :]
+#Removing rows with missing retention factor and outliers
+Final_table_unique = remove_missing_and_outliers(Final_table_unique)
 
-Final_table_unique = dropmissing(Final_table_unique, :Retention_factors)
-valuess = Final_table_unique.Retention_factors
-indexes = Int[]
-for i = 1:length(valuess)
-    if typeof(valuess[i]) == Float64
-        push!(indexes, i)
-    end
-end
-indexes
-Final_table_unique = Final_table_unique[indexes,:]
+#Formatting MACCS and PubChem Fingerprints for modelling
+MACCS, PubChem_fps = format_fingerprints(Final_table_unique)
 
-MACCS = Int.(zeros(length(Final_table_unique[:,2]),166))
-for i = 1:length(Final_table_unique[:,3])
-    string_bits = Final_table_unique[i,3]
-    vectorized_bits = parse.(Int, split(string_bits, ","))
-    for v in vectorized_bits
-        MACCS[i,v] = 1
-    end
-end
-MACCS
-Pubchem_fps = Int.(zeros(length(Final_table_unique[:,4]),881))
-for i = 1:length(Final_table_unique[:,4])
-    string_bits = Final_table_unique[i,4]
-    vectorized_bits = parse.(Int, split(string_bits, ","))
-    for v in vectorized_bits
-        Pubchem_fps[i,v] = 1
-    end
-end
-Pubchem_fps
-
+#Getting indices for RPLC and HILIC rows
 indices_RPLC = findall(row -> occursin("RP", row.LC_mode), eachrow(Final_table_unique))
 indices_HILIC = findall(row -> occursin("HILIC", row.LC_mode), eachrow(Final_table_unique))
 
-X = [MACCS Pubchem_fps]
-y = Final_table_unique[indices_RPLC,6]
-X = X[indices_RPLC,:]
 
 
 histogram(Final_table_unique[indices_HILIC,7], bins = 50, title = "Classification of HILIC retention indices",
@@ -216,9 +290,10 @@ savefig("C:\\Users\\uqthulle\\Documents\\Plots\\2d histograpm rplc.png")
 
 indices_0_2 = findall(x-> x <0.2, Final_table_unique[:,end-1])
 histogram(Final_table_unique[:,end-1])
-histogram(Final_table_unique[:,end]./100)
-vline!([0.333, 0.666,1])
-vline!([0.333,0.666,1])
+histogram(Final_table_unique[:,end]./100, label = false, dpi = 300,
+xlabel = "%B")
+vline!([0.333, 0.666,1], label = false)
+vline!([0.333,0.666,1], label = false)
 
 histogram2d((Final_table_unique[indices_RPLC,end]./100), 
 Final_table_unique[indices_RPLC,end-1],
@@ -231,7 +306,7 @@ ylims = (0,1))
 
 b_separator = 0.33333333
 rf_separator = 0.33333333
-
+using Plots
 plot!(rectangle(b_separator,rf_separator,0,0), opacity = 0.4, c = :red, label = "Very mobile")
 plot!(rectangle(b_separator,rf_separator,b_separator,0.25), opacity = 0.4, c = :darkorange, label = "Moderately mobile")
 plot!(rectangle(b_separator,rf_separator,b_separator*2,0.4), opacity = 0.4, c = :green, label = "Not mobile")
