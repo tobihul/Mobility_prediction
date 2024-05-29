@@ -4,10 +4,10 @@ using ScikitLearn: @sk_import
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
 @sk_import model_selection: train_test_split
-folder_path = "C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data"
+folder_path = "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data"
 Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
-MACCS_keys = readlines( "C:\\Users\\uqthulle\\Documents\\MACCS keys.txt")
-PubChem_keys = readlines( "C:\\Users\\uqthulle\\Documents\\PubChem keys.txt")
+MACCS_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\MACCS keys.txt")
+PubChem_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\PubChem keys.txt")
 All_keys =  [MACCS_keys ;PubChem_keys]
 All_keys_y = [MACCS_keys ;PubChem_keys]
 function interpolate_B_modifier(time::Float64, gradient::DataFrame)
@@ -126,7 +126,7 @@ function Stratifiedcv(X, groups, n_folds)
 end
 for i = 1:374
     #Locating the file
-    current_file = joinpath("C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
+    current_file = joinpath("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
     println(i)
     #Getting the SMILES and retention times
     rt_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "rtdata_canonical_success.tsv"],"_"))
@@ -206,34 +206,31 @@ indices_HILIC = findall(row -> occursin("HILIC", row.LC_mode), eachrow(Final_tab
 """RandomForestClassifier based on mobility"""
 
 ##Assigning the mobility classes First
-Retention_factors = Final_table_unique[indices_RPLC,end-1]
+Retention_factors = Float64.(Final_table_unique[indices_RPLC,end-1])
 p_b = Final_table_unique[indices_RPLC,end]./100
 
 #Shuffling data and creating classes
 Random.seed!(42)
 X = [MACCS PubChem_fps]
 
-X = (X[indices_RPLC,:])
+X = [X[indices_RPLC,:] collect(1:length(indices_RPLC))]
 
-x = Float64.(vec(Final_table_unique[indices_RPLC,end]))
-y = Float64.(Matrix(Final_table_unique[indices_RPLC,end-1:end]))
 # Set the number of clusters
 k = 3
 
 # Perform k-means clustering
-result = kmeans(x', k)
+result = kmeans(X', k)
 
 # Extract the results
 clusters = result.assignments  # Cluster assignments for each data point
 centroids = result.centers     # Centroids of the clusters
 
-
 indices_1 = findall(x-> x == 1, clusters)
 indices_2 = findall(x-> x == 2, clusters)
 indices_3 = findall(x-> x == 3, clusters)
-histogram(Final_table_unique[indices_RPLC,end][indices_1], xlims = (0,100))
-histogram!(Final_table_unique[indices_RPLC,end][indices_2], xlims = (0,100))
-histogram!(Final_table_unique[indices_RPLC,end][indices_3], xlims = (0,100))
+histogram(Final_table_unique[indices_RPLC,end-1][indices_1], xlims = (0,1))
+histogram!(Final_table_unique[indices_RPLC,end-1][indices_2], xlims = (0,1))
+histogram!(Final_table_unique[indices_RPLC,end-1][indices_3], xlims = (0,1), legend = false)
 # Print the results
 println("Cluster assignments: ", clusters)
 println("Centroids: ", centroids)
@@ -242,19 +239,16 @@ y = clusters
 scatter(X[:, 1], X[:, 2], group=clusters, legend=false)
 scatter!(centroids[:, 1], centroids[:, 2], ms=2, mc=:black)
 y = []
-for i in eachindex(Retention_factors)
-    if Retention_factors[i] >= 0.5 
+for i in eachindex(p_b)
+    if p_b[i] >= 0.6
         push!(y, "Non-mobile")
-    elseif Retention_factors[i] <= 0.2
+    elseif p_b[i] <= 0.2
         push!(y, "Very mobile")
     else 
         push!(y, "Mobile")
     end
 end
 
-sum(y.=="Mobile")
-sum(y.=="Non-mobile")
-sum(y.=="Very mobile")
 
 shuffle_indices = shuffle(collect(1:length(y)))
 
@@ -262,38 +256,21 @@ X = X[shuffle_indices,:]
 
 y = y[shuffle_indices]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, stratify=y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, stratify=y, random_state = 42)
 
 
 #Manual Hyperparameter optimisation for ScikitLearn RF
-n_estimators_t = 100
-
-criterion = "gini"
-
-min_samples_split_t = [2]
-
-min_samples_leaf_t = [1]
-
-random_state = 42
-
-f_name = "Random Forest Classification RPLC"
-
-df_results_3 = DataFrame(n_estimators = Int[], min_samples_split = Int[], min_samples_leaf = Int[], train_score = Float64[], test_score = Float64[])
-
-df_results_3 = CSV.read("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", DataFrame)
-
 rf_cl = RandomForestClassifier(n_estimators = 10, random_state = 42)
 
-ScikitLearn.fit!(rf_cl, X_train, y_train)
+ScikitLearn.fit!(rf_cl, X_train[:,1:end-1], y_train)
 
-y_hat_train = ScikitLearn.predict(rf_cl,X[model,:])
-y_hat_test = ScikitLearn.predict(rf_cl,X[test_final,:])
+y_hat_train = ScikitLearn.predict(rf_cl,X_train[:,1:end-1])
+y_hat_test = ScikitLearn.predict(rf_cl,X_test[:,1:end-1])
 
-score_train = ScikitLearn.score(rf_cl, X[model,:], y[model])
-score_test = ScikitLearn.score(rf_cl, X[test_final,:], y[test_final])
+score_train = ScikitLearn.score(rf_cl, X_train[:,1:end-1], y_train)
+score_test = ScikitLearn.score(rf_cl, X_test[:,1:end-1], y_test)
 
-scatter(y[model], y_hat_train, label = "train = $(round(score_train, digits= 2))", xlims = (0,1), ylims = (0,1), dpi = 300)
-scatter!(y[test_final],y_hat_test, label = "test = $(round(score_test, digits= 2))")
+confusion_matrix(y_hat_test, y_test)
 
 importance = rf_cl.feature_importances_
 
@@ -309,21 +286,23 @@ bottom_margin = 8Plots.mm,
 legend = false)
 
 # Get predicted probabilities for test set
-y_prob_test = ScikitLearn.predict_proba(rf_cl, X[test_final,:])
+y_prob_test = ScikitLearn.predict_proba(rf_cl, X_test)
 
 real = y_test
 pred = y_hat_test
-pred = real
+
+
+
 
 sum(real.=="Mobile")
 sum(real.=="Very mobile")
 sum(real.=="Non-mobile")
-threshold = collect(0:0.01:1)
+threshold = collect(0.01:0.01:1)
 
 num_classes = 3
 
 TPRs = zeros(num_classes, length(threshold))
-FPRs = zeros(num_classes, length(threshold))
+FDRs = zeros(num_classes, length(threshold))
 for c in 1:num_classes
     for j in eachindex(threshold)
         TP, FP, TN, FN = 0, 0, 0, 0
@@ -343,14 +322,14 @@ for c in 1:num_classes
             end
         end
         TPRs[c, j] = TP / (TP + FN)
-        FPRs[c, j] = FP / (FP + TP)
+        FDRs[c, j] = FP / (TP + FP)
     end
 end
-FPRs
+
 # Plot ROC curves for each class
 scatter(FPRs[1,:], TPRs[1,:],
 title = "ROC curve even split %B mobile phase",
-xlabel = "FPR", ylabel = "TPR", 
+xlabel = "FDR", ylabel = "TPR", 
 label = "Mobile", 
 dpi = 300)
 scatter!(FPRs[2,:], TPRs[2,:], label = "Non-mobile")
@@ -359,4 +338,19 @@ plot!(threshold, threshold, linestyle = :dash, label = false)
 
 rf_cl.classes_
 
-savefig("C:\\Users\\uqthulle\\Documents\\Plots\\k means mobile phase split.png")
+
+compounds = []
+for i in eachindex(y_test)
+    if y_test[i] == "Very mobile" && y_hat_test[i] == "Non-mobile"
+        push!(compounds, i)
+    end
+end
+compounds
+
+wrong_compounds = X[compounds,end]
+
+println(Final_table_unique[indices_RPLC,:][wrong_compounds,:])
+
+
+
+

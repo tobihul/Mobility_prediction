@@ -1,10 +1,131 @@
-using CSV, Statistics, DataFrames, StatsPlots
-folder_path = "C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data"
-Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[], XlogP = Float64[], Retention_factors = Float64[])
+using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots, MultivariateStats
+using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils
+using ScikitLearn: @sk_import
+@sk_import ensemble: RandomForestRegressor
+@sk_import model_selection: StratifiedKFold
+folder_path = "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data"
+Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
+MACCS_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\MACCS keys.txt")
+PubChem_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\PubChem keys.txt")
+All_keys =  [MACCS_keys ;PubChem_keys]
+All_keys_y = [MACCS_keys ;PubChem_keys]
+function interpolate_B_modifier(time::Float64, gradient::DataFrame)
+    times = gradient[:,1]./run_time
+    idx = searchsortedlast(times, time)
+    if idx == 0
+        return gradient[1,3]
+    elseif idx == length(times)
+        return gradient[end,3]
+    elseif time > 1
+        return gradient[end,3]
+    else
+        t1, t2 = times[idx], times[idx+1]
+        B1, B2 = gradient[:,3][idx], gradient[:,3][idx+1]
+        return B1 + (B2 - B1) * (time - t1) / (t2 - t1)
+    end
+end
+function calculate_leverage(X,x)
+    leverage = zeros(length(x[:,1]))
+    b = pinv(X'*X)
+    for i = 1:length(x[:,1])
+        leverage[i] = (x[i,:])' * b * x[i,:] 
+    end
+    return leverage
+end
+function remove_overlapping(Results_table)
 
+    # Separate entries with RP and HILIC modes
+    rp_Inchikey = Results_table[Results_table.LC_mode .== "RP", :].Inchikey
+    hilic_Inchikey = Results_table[Results_table.LC_mode .== "HILIC", :].Inchikey
+
+    # Find the intersection of CIDss for both modes
+    common_Inchikey = intersect(rp_Inchikey, hilic_Inchikey)
+
+    #Removing the ones that have been separated by both as we already have them
+    condition = in.(Results_table.Inchikey, Ref(common_Inchikey))
+    Final_table_unique = Results_table[.!condition, :]
+
+    return Final_table_unique
+end
+function remove_missing_and_outliers(Results_unique)
+    #This removes rows that have missing retention factors due to no gradient data or other 
+    valuess = Results_unique.Retention_factors
+    indexes = Int[]
+    for i = 1:length(valuess)
+        if !ismissing(valuess[i]) && typeof(valuess[i]) == Float64
+            push!(indexes, i)
+        end
+    end
+    indexes
+    Results_unique = Results_unique[indexes,:]
+
+    #This removes outliers with high retention factor but low %B
+    rtfs = Results_unique[:,end-1]
+    pmbph = Results_unique[:,end]
+    indexes = Int[]
+    for i = 1:length(rtfs)
+        if rtfs[i] > 0.65 && pmbph[i] < 12.5
+            continue
+        else
+            push!(indexes, i)
+        end
+    end
+    indexes
+    Results_unique = Results_unique[indexes,:]
+    return Results_unique
+end
+function format_fingerprints(Final_table_unique)
+    #First we get MACCS
+    MACCS = Int.(zeros(length(Final_table_unique[:,2]),166))
+    for i = 1:length(Final_table_unique[:,3])
+        string_bits = Final_table_unique[i,3]
+        vectorized_bits = parse.(Int, split(string_bits, ","))
+        for v in vectorized_bits
+            MACCS[i,v] = 1
+        end
+    end
+    #Now PubChem FPs
+    Pubchem_fps = Int.(zeros(length(Final_table_unique[:,4]),881))
+    for i = 1:length(Final_table_unique[:,4])
+        string_bits = Final_table_unique[i,4]
+        vectorized_bits = parse.(Int, split(string_bits, ","))
+        for v in vectorized_bits
+            Pubchem_fps[i,v] = 1
+        end
+    end
+    return MACCS, Pubchem_fps
+end
+function custom_binning(y, num_bins)
+    min_val = minimum(y)
+    max_val = maximum(y)
+    bin_width = (max_val - min_val) / num_bins
+    bins = Array{Int}(undef, length(y))
+    
+    for i in 1:length(y)
+        bin_index = ceil(Int, (y[i] - min_val) / bin_width)
+        bins[i] = min(bin_index, num_bins)
+    end
+    
+    return bins
+end
+function Stratifiedcv(X, groups, n_folds)
+    # Initialize StratifiedKFold
+    skf = StratifiedKFold(n_splits=n_folds)
+
+    # Initialize variables to store indices for each fold
+    train_indices = Vector{Vector{Int}}(undef, n_folds)
+    test_indices = Vector{Vector{Int}}(undef, n_folds)
+
+    # Iterate over the splits and store indices for each fold
+    for (i, (train_idx, test_idx)) in enumerate(skf.split(X, groups))
+        train_indices[i] = train_idx .+ 1  # Adjust for 1-based indexing
+        test_indices[i] = test_idx .+ 1  # Adjust for 1-based indexing
+    end
+    return train_indices, test_indices
+end
 for i = 1:374
     #Locating the file
-    current_file = joinpath("C:\\Users\\uqthulle\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
+    current_file = joinpath("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
     println(i)
     #Getting the SMILES and retention times
     rt_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "rtdata_canonical_success.tsv"],"_"))
@@ -16,14 +137,17 @@ for i = 1:374
      gradient_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "gradient.tsv"],"_"))
      gradient = CSV.read(gradient_path, DataFrame)
      local retention_factors
+     Modifier = []
      try 
-         run_time = gradient[end,1]
-         retention_factors = RT./run_time
+        run_time = gradient[end,1]
+        retention_factors = RT./run_time
+        for rtfs in retention_factors
+            push!(Modifier, interpolate_B_modifier(rtfs, gradient))
+        end
      catch
-         retention_factors = repeat(["No gradient info"], length(RT))
+         retention_factors = repeat(["Not gradient info"], length(RT))
+         Modifier = repeat(["Not gradient info"], length(RT))
      end
-
-
     #Getting the MACCS
     MACCS_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "fingerprints_maccs_canonical_success.tsv"],"_"))
     MACCS_info = CSV.read(MACCS_path, DataFrame)
@@ -59,113 +183,131 @@ for i = 1:374
     
   
     #Getting all the data in one table to append all the other datasets in this format
-    current_table = DataFrame(Inchikey = Compound_Inchi, LC_mode = LC_mode, MACCS = MACCS, Pubchem_fps = Pubchem_fps, XlogP = XLogP, Retention_factors = retention_factors)
+    current_table = DataFrame(Inchikey = Compound_Inchi, LC_mode = LC_mode, MACCS = MACCS, Pubchem_fps = Pubchem_fps,MW = MW, XlogP = XLogP, Retention_factors = retention_factors, Modifier = Modifier)
     Final_table = vcat(Final_table, current_table)
 end
 
-# Separate entries with RP and HILIC modes
-rp_Inchikey = Final_table[Final_table.LC_mode .== "RP", :].Inchikey
-hilic_Inchikey = Final_table[Final_table.LC_mode .== "HILIC", :].Inchikey
+Final_table
 
-# Find the intersection of CIDss for both modes
-common_Inchikey = intersect(rp_Inchikey, hilic_Inchikey)
+#Removing compounds that occur both in RPLC and HILIC 
+Final_table_unique = remove_overlapping(Final_table)
 
-#Removing the ones that have been separated by both as we already have them
-condition = in.(Final_table.Inchikey, Ref(common_Inchikey))
-Final_table_unique = Final_table[.!condition, :]
+#Removing rows with missing retention factor and outliers
+Final_table_unique = remove_missing_and_outliers(Final_table_unique)
 
-Final_table_unique
-valuess = Final_table_unique.Retention_factors
-indexes = Int[]
-for i = 1:length(valuess)
-    if !ismissing(valuess[i]) && typeof(valuess[i]) == Float64
-        push!(indexes, i)
-    end
-end
-indexes
-Final_table_unique = Final_table_unique[indexes,:]
+#Formatting MACCS and PubChem Fingerprints for modelling
+MACCS, PubChem_fps = format_fingerprints(Final_table_unique)
 
-MACCS = Int.(zeros(length(Final_table_unique[:,2]),166))
-for i = 1:length(Final_table_unique[:,3])
-    string_bits = Final_table_unique[i,3]
-    vectorized_bits = parse.(Int, split(string_bits, ","))
-    for v in vectorized_bits
-        MACCS[i,v] = 1
-    end
-end
-MACCS
-Pubchem_fps = Int.(zeros(length(Final_table_unique[:,4]),881))
-for i = 1:length(Final_table_unique[:,4])
-    string_bits = Final_table_unique[i,4]
-    vectorized_bits = parse.(Int, split(string_bits, ","))
-    for v in vectorized_bits
-        Pubchem_fps[i,v] = 1
-    end
-end
-Pubchem_fps
-
+#Getting indices for RPLC and HILIC rows
 indices_RPLC = findall(row -> occursin("RP", row.LC_mode), eachrow(Final_table_unique))
 indices_HILIC = findall(row -> occursin("HILIC", row.LC_mode), eachrow(Final_table_unique))
 
-using Random, DecisionTree, MLJ
+###########################################################################################################
+#Random forest classification
 Random.seed!(42)
-X = [MACCS Pubchem_fps]
+Retention_factors = Final_table_unique[indices_RPLC,end-1]
+p_b = Final_table_unique[indices_RPLC,end]./100
+X = [MACCS PubChem_fps]
 
-#Selecting either HILIC or RPLC data
-y = Final_table_unique[indices_HILIC,6]
-X = X[indices_HILIC,:]
+X = (X[indices_RPLC,:])
 
-#Shuffling the data
+y = []
+for i in eachindex(Retention_factors)
+    if p_b[i] >= 0.6
+        push!(y, "Non-mobile")
+    elseif p_b[i] <= 0.2
+        push!(y, "Very mobile")
+    else 
+        push!(y, "Mobile")
+    end
+end
+
+sum(y.=="Non-mobile")
+sum(y.=="Mobile")
+sum(y.=="Very mobile")
+
 shuffle_indices = shuffle(collect(1:length(y)))
+
 X = X[shuffle_indices,:]
-y= y[shuffle_indices]
+
+y = y[shuffle_indices]
+
+X_test, X_train, y_test, y_train = train_test_split(X, y, test_size= 0.8, stratify=y)
+
+using DecisionTree
+
+model = DecisionTree.RandomForestClassifier(n_trees = 20)
+
+DecisionTree.fit!(model, X_train, y_train)
+
+y_hat_test = DecisionTree.predict(model, X_test)
+
+# check accuracy
+
+accuracy = mean(y_hat_test .== y_test)
+
+# display confusion matrix
+
+confusion_matrix(y_test, y_hat_test)
+
+y_prob_test = DecisionTree.predict_proba(model, X_test)
 
 
-train, test = partition(eachindex(y), 0.8, rng=42)
-
-df_results_2 = DataFrame(n_subfeatures = Int[],n_trees = Int[],partial_sampling=Float32[],max_depth = Int[],min_samples_leaf=Int[],min_samples_split = Int[],min_purity_increase = Float32[],score=Float32[])
-df_results_2 = CSV.read("C:\\Users\\uqthulle\\Documents\\$file_name.csv ", DataFrame)
-
-n_folds = 3
-n_subfeatures_t= [1047]
-n_trees_t=[100]
-partial_sampling_t= [0.7]
-max_depth_t=[-1]
-min_samples_leaf_t=[2]
-min_samples_split_t=[2]
-min_purity_increase_t=[0.0]
-seed=42
-file_name = "DecisionTree.jl Results HILIC"   
-iteration = 1
-for n_subfeatures in n_subfeatures_t
-    for n_trees in n_trees_t
-        for partial_sampling in partial_sampling_t
-            for max_depth in max_depth_t
-                for min_samples_leaf in min_samples_leaf_t
-                    for min_samples_split in min_samples_split_t
-                        for min_purity_increase in min_purity_increase_t
-
-
-                            r2 =  nfoldCV_forest(y, X,
-                                                n_folds,
-                                                n_subfeatures,
-                                                n_trees,
-                                                partial_sampling,
-                                                max_depth,
-                                                min_samples_leaf,
-                                                min_samples_split,
-                                                min_purity_increase;
-                                                verbose = false,
-                                                rng = seed)
-                                            score = mean(r2)
-                                            push!(df_results_2,[n_subfeatures,n_trees,partial_sampling,max_depth,min_samples_leaf,min_samples_split,min_purity_increase,score])
-                        end
-                    end
+real = y_test
+pred = y_hat_test
+num_classes = 3
+threshold = collect(0.01:0.01:1)
+TPRs = zeros(num_classes, length(threshold))
+FDRs = zeros(num_classes, length(threshold))
+for c in 1:num_classes
+    for j in eachindex(threshold)
+        TP, FP, TN, FN = 0, 0, 0, 0
+        for i in eachindex(y_hat_test)
+            if y_prob_test[i, c] >= threshold[j]
+                if real[i] == pred[i]
+                    TP += 1
+                else
+                    FP += 1
+                end
+            else
+                if real[i] != pred[i]
+                    TN += 1
+                else
+                    FN += 1
                 end
             end
         end
+        TPRs[c, j] = TP / (TP + FN)
+        FDRs[c, j] = FP / (TP + FP)
     end
-end    
-                                            
-                                    vscodedisplay(df_results_2)       
-                                            CSV.write("C:\\Users\\uqthulle\\Documents\\$file_name.csv ", df_results_2)
+end
+FDRs
+# Plot ROC curves for each class
+scatter(FDRs[1,:], TPRs[1,:],
+title = "ROC curve even split %B mobile phase",
+xlabel = "FDR", ylabel = "TPR", 
+label = "Mobile", 
+dpi = 300, zcolor = threshold, colorbar_title = "Prob. threshold",
+xlims = (0,1), ylims = (0,1))
+scatter!(FDRs[2,:], TPRs[2,:], label = "Non-mobile")
+scatter!(FDRs[3,:], TPRs[3,:], label = "Very mobile")
+plot!(threshold, threshold, linestyle = :dash, label = false)
+
+plot(TPRs[1,:], ylims = (0,1))
+
+n_subfeatures=-1; n_trees=10; partial_sampling=1; max_depth=-1
+min_samples_leaf=2; min_samples_split=2; min_purity_increase=0.0; seed=42
+
+model    =   DecisionTree.build_forest(y_train, X_train,
+                          n_subfeatures,
+                          n_trees,
+                          partial_sampling,
+                          max_depth,
+                          min_samples_leaf,
+                          min_samples_split,
+                          min_purity_increase;
+                          rng = seed)
+
+y_hat_test = apply_forest(model, X_test)
+
+y_prob_test = apply_forest_proba(model, X_test, ["Mobile", "Non-mobile", "Very mobile"])
