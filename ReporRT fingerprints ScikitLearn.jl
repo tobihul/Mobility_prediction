@@ -210,7 +210,7 @@ X = [MACCS PubChem_fps]
 
 X = (X[indices_RPLC,:])
 
-y = Float64.(Final_table_unique[:,7][indices_RPLC])
+y = Float64.(Final_table_unique[:,end][indices_RPLC]./100)
 
 shuffle_indices = shuffle(collect(1:length(y)))
 
@@ -218,8 +218,18 @@ X = X[shuffle_indices,:]
 
 y = y[shuffle_indices]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, stratify=y)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, random_state = 42)
 
+classes_test= []
+for i in eachindex(y_test)
+    if y_test[i] >= 0.6
+        push!(classes_before, "Non-mobile")
+    elseif y_test[i] <= 0.2
+        push!(classes_before, "Very mobile")
+    else 
+        push!(classes_before, "Mobile")
+    end
+end
 #######################
 #Manual Hyperparameter optimisation for ScikitLearn RF
 n_estimators_t = 15
@@ -310,16 +320,16 @@ rf_regressor = RandomForestRegressor(n_estimators = df_results_3.n_estimators[in
 rf_regressor = RandomForestRegressor(n_estimators = 10, criterion = "squared_error", 
                                      min_samples_split = 2, min_samples_leaf = 1, random_state = 42, n_jobs = -1)
 
-ScikitLearn.fit!(rf_regressor, X[model,:], y[model])
+ScikitLearn.fit!(rf_regressor, X_train, y_train)
 
-y_hat_train = ScikitLearn.predict(rf_regressor,X[model,:])
-y_hat_test = ScikitLearn.predict(rf_regressor,X[test_final,:])
+y_hat_train = ScikitLearn.predict(rf_regressor,X_train)
+y_hat_test = ScikitLearn.predict(rf_regressor,X_test)
 
-score_train = ScikitLearn.score(rf_regressor, X[model,:], y[model])
-score_test = ScikitLearn.score(rf_regressor, X[test_final,:], y[test_final])
+score_train = ScikitLearn.score(rf_regressor, X_train, y_train)
+score_test = ScikitLearn.score(rf_regressor, X_test, y_test)
 
-scatter(y[model], y_hat_train, label = "train = $(round(score_train, digits= 2))", xlims = (0,1), ylims = (0,1), dpi = 300)
-scatter!(y[test_final],y_hat_test, label = "test = $(round(score_test, digits= 2))")
+scatter(y_train, y_hat_train, label = "train = $(round(score_train, digits= 2))", xlims = (0,1), ylims = (0,1), dpi = 300)
+scatter!(y_test,y_hat_test, label = "test = $(round(score_test, digits= 2))")
 
 importance = rf_regressor.feature_importances_
 
@@ -334,6 +344,18 @@ title = "RPLC important variables",
 bottom_margin = 8Plots.mm,
 legend = false)
 
+classes_pred = []
+for i in eachindex(y_hat_test)
+    if y_hat_test[i] >= 0.6
+        push!(classes_pred, "Non-mobile")
+    elseif p_b[i] <= 0.2
+        push!(classes_pred, "Very mobile")
+    else 
+        push!(classes_pred, "Mobile")
+    end
+end
+
+confusion_matrix(classes_test, classes_pred)
 #leverage
 
 leverage = calculate_leverage(X[model,:], X[test_final,:])
@@ -357,7 +379,7 @@ scatter!(y[test_final][indices_outside_AD],y_hat_test[indices_outside_AD], label
 
 
 cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
-savefig("k means mobile phase.png")
+savefig("Old boundaries.png")
 cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
 
 

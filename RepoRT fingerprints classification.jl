@@ -216,14 +216,13 @@ vspan!([separator*3, maximum(Final_table_unique[indices_HILIC,7])], color=:red, 
 
 savefig("C:\\Users\\uqthulle\\Documents\\Plots\\RPLC space with organic modifier.png")
 
-
-histogram(Final_table_unique[indices_RPLC,7], title = "Classification of RPLC retention indices",
+Final_table_unique
+histogram(Final_table_unique[indices_RPLC,8]./100, title = "Classification of RPLC %B",
 dpi = 300, label = false)
-separator = 0.2
-vspan!([0, separator], color=:red, alpha=0.3, label = "Very mobile")
-vspan!([separator, separator*2], color=:darkorange, alpha=0.3, label = "Mobile")
-vspan!([separator*2, separator*3], color=:yellow3, alpha=0.3, label = "Not very mobile")
-vspan!([separator*3, maximum(Final_table_unique[indices_RPLC,7])], color=:green, alpha=0.3, label = "Non-mobile")
+separator = 0.333
+vspan!([0, 0.333], color=:red, alpha=0.3, label = "Very mobile")
+vspan!([0.333, 0.666], color=:darkorange, alpha=0.3, label = "Mobile")
+vspan!([0.666, maximum(Final_table_unique[indices_RPLC,7])], color=:green, alpha=0.3, label = "Non-mobile")
 
 
 Table_RPLC = Final_table_unique[indices_RPLC, :]
@@ -315,10 +314,10 @@ plot!(rectangle(b_separator,rf_separator,b_separator*2,0.4), opacity = 0.4, c = 
 scatter((Final_table_unique[indices_RPLC,end]./100), Final_table_unique[indices_RPLC,6], zcolor =Final_table_unique[indices_RPLC,end-1] )
 
 
-findall(Final_table_unique[indices_RPLC,end])
 
-condition_1(x) = x < 12.5
-condition_2(x) = x > 0.65
+
+condition_1(x) = x > 80
+condition_2(x) = x > 0.8
 
 # Find indices where both conditions are satisfied
 indices = findall(x -> condition_1(Final_table_unique[indices_RPLC,end][x]) && condition_2(Final_table_unique[indices_RPLC,end-1][x]), 1:min(length(Final_table_unique[indices_RPLC,end]), length(Final_table_unique[indices_RPLC,end-1])))
@@ -327,9 +326,9 @@ scatter(Final_table_unique[indices_RPLC,end][indices],Final_table_unique[indices
 title = "RPLC Modifier vs Retention factor", xlabel = "%B", ylabel = "Retention factor",
 label = false, xlims = (0,100), ylims = (0,1))
 
-println(Final_table_unique[indices_RPLC,1][indices][10])
-println(Final_table_unique[indices_RPLC,5][indices][10])
-println(Final_table_unique[indices_RPLC,6][indices][10])
+println(Final_table_unique[indices_RPLC,1][indices][19])
+println(Final_table_unique[indices_RPLC,5][indices][19])
+println(Final_table_unique[indices_RPLC,6][indices][19])
 
 outlier_compounds = Final_table_unique[indices_RPLC,:][indices,:]
 
