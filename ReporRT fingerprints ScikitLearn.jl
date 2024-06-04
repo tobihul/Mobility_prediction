@@ -317,7 +317,7 @@ rf_regressor = RandomForestRegressor(n_estimators = df_results_3.n_estimators[in
                                      min_samples_split = df_results_3.min_samples_split[ind_best], min_samples_leaf = 1, random_state = 42, n_jobs = -1)
 
 #Manually
-rf_regressor = RandomForestRegressor(n_estimators = 10, criterion = "squared_error", 
+rf_regressor = RandomForestRegressor(n_estimators = 15, criterion = "squared_error", 
                                      min_samples_split = 2, min_samples_leaf = 1, random_state = 42, n_jobs = -1)
 
 ScikitLearn.fit!(rf_regressor, X_train, y_train)
@@ -379,7 +379,7 @@ scatter!(y[test_final][indices_outside_AD],y_hat_test[indices_outside_AD], label
 
 
 cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
-savefig("Old boundaries.png")
+savefig("TPR FDR all data.png")
 cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
 
 

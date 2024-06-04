@@ -1,8 +1,9 @@
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots, MultivariateStats
-using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils
+using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLJ, MLDataUtils, Clustering, HypothesisTests
 using ScikitLearn: @sk_import
-@sk_import ensemble: RandomForestRegressor
+@sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
+@sk_import model_selection: train_test_split
 folder_path = "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data"
 Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
 MACCS_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\MACCS keys.txt")
@@ -28,7 +29,7 @@ function calculate_leverage(X,x)
     leverage = zeros(length(x[:,1]))
     b = pinv(X'*X)
     for i = 1:length(x[:,1])
-        leverage[i] = (x[i,:])' * b * x[i,:] 
+        leverage[i] = pinv(x[i,:]) * b * x[i,:] 
     end
     return leverage
 end
@@ -123,6 +124,106 @@ function Stratifiedcv(X, groups, n_folds)
     end
     return train_indices, test_indices
 end
+function TPR_FDR(c_matrix)
+    TP_M = c_matrix[1,1]
+    FN_M = c_matrix[2,1] + c_matrix[3,1]
+    FP_M = c_matrix[1,2] + c_matrix[1,3]
+    TPR_M = TP_M/(TP_M + FN_M)
+    FDR_M = FP_M/(TP_M + FP_M)
+
+    TP_NM = c_matrix[2,2]
+    FN_NM = c_matrix[1,2] + c_matrix[3,2]
+    FP_NM = c_matrix[2,1] + c_matrix[2,3]
+    TPR_NM = TP_NM/(TP_NM + FN_NM)
+    FDR_NM = FP_NM/(TP_NM + FP_NM)
+
+    TP_VM = c_matrix[3,3]
+    FN_VM = c_matrix[1,3] + c_matrix[2,3]
+    FP_VM = c_matrix[3,1] + c_matrix[3,2]
+    TPR_VM = TP_VM/(TP_VM + FN_VM)
+    FDR_VM = FP_VM/(TP_VM + FP_VM)
+
+    Classes = ["Mobile", "Non-Mobile", "Very mobile"]
+    TPRs = [TPR_M, TPR_NM, TPR_VM]
+    FDRs = [FDR_M, FDR_NM, FDR_VM]
+    df = DataFrame(Class = Classes, TPR = TPRs, FDR = FDRs)
+
+    return df
+end
+function remove_high_std(RPLC_data, std_threshold)
+    unique_compounds = unique(RPLC_data[:,1])
+
+    standard_devs = []
+
+    standard_devs_2 = []
+
+    for i in eachindex(unique_compounds)
+        if i % 100 == 0
+            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
+        end
+
+        occurrences = findall(x-> x == unique_compounds[i], Final_table_unique[indices_RPLC,1])
+
+        if length(occurrences) > 0
+
+            push!(standard_devs,std(Final_table_unique[indices_RPLC,end][occurrences]./100))
+
+            push!(standard_devs_2,std(Final_table_unique[indices_RPLC,end-1][occurrences]))
+        end
+    end
+
+    high_std_cmp = unique_compounds[findall(x-> x>=std_threshold, standard_devs)]
+
+    filtered_RPLC_data = RPLC_data[.!in.(RPLC_data.Inchikey, Ref(high_std_cmp)), :]
+
+    return filtered_RPLC_data
+
+end
+function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
+    fingerprints = [MACCS PubChem_fps]
+
+    p_b = filtered_RPLC_data[:,end]./100
+
+    unique_compounds = unique(filtered_RPLC_data[:,1])
+
+    train, test = train_test_split(unique_compounds, test_size = split, random_state = 42)
+
+    y = []
+    for i in eachindex(p_b)
+        if p_b[i] >= 0.6
+            push!(y, "Non-mobile")
+        elseif p_b[i] <= 0.2
+            push!(y, "Very mobile")
+        else 
+            push!(y, "Mobile")
+        end
+    end
+    # Initialize variables
+    train_indices = []
+    test_indices = []
+
+    # Find indices for train and test data
+    @time for i in eachindex(unique_compounds)
+        if (i % 100) == 0
+            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
+        end
+        occurrences = findall(x -> x == unique_compounds[i], filtered_RPLC_data[:, 1])
+        if unique_compounds[i] in train
+            append!(train_indices, occurrences)
+        else
+            append!(test_indices, occurrences)
+        end
+    end
+
+    # Extract train and test data
+    X_train = fingerprints[train_indices, :]
+    X_test = fingerprints[test_indices, :]
+    y_train = y[train_indices]
+    y_test = y[test_indices]
+
+    return X_train, X_test, y_train, y_test
+end
+
 for i = 1:374
     #Locating the file
     current_file = joinpath("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
@@ -202,115 +303,69 @@ MACCS, PubChem_fps = format_fingerprints(Final_table_unique)
 indices_RPLC = findall(row -> occursin("RP", row.LC_mode), eachrow(Final_table_unique))
 indices_HILIC = findall(row -> occursin("HILIC", row.LC_mode), eachrow(Final_table_unique))
 
-###########################################################################################################
-#Random forest classification
-Random.seed!(42)
-Retention_factors = Final_table_unique[indices_RPLC,end-1]
-p_b = Final_table_unique[indices_RPLC,end]./100
-X = [MACCS PubChem_fps]
+RPLC_data = Final_table_unique[indices_RPLC,:]
 
-X = [(X[indices_RPLC,:]) collect(1:length(indices_RPLC))]
+#############################################################################################################
+#Removing if std > 0.3
 
-y = []
-for i in eachindex(Retention_factors)
-    if p_b[i] >= 0.6
-        push!(y, "Non-mobile")
-    elseif p_b[i] <= 0.2
-        push!(y, "Very mobile")
-    else 
-        push!(y, "Mobile")
-    end
-end
+@time filtered_RPLC_data = remove_high_std(RPLC_data, 1)
+filtered_RPLC_data
+MACCS, PubChem_fps = format_fingerprints(filtered_RPLC_data)
+MACCS
+PubChem_fps
 
-sum(y.=="Non-mobile")
-sum(y.=="Mobile")
-sum(y.=="Very mobile")
+#############################################################################################################
+#Train/test split without data leakage
 
-shuffle_indices = shuffle(collect(1:length(y)))
+X_train, X_test, y_train, y_test = train_test_split_no_leakage_classifier(filtered_RPLC_data, 0.1)
 
-X = X[shuffle_indices,:]
+#############################################################################################################
+#Making the model
 
-y = y[shuffle_indices]
+rf_cl = RandomForestClassifier(n_estimators = 20, random_state = 42)
 
-indices_X = collect(1:size(X, 1))
+ScikitLearn.fit!(rf_cl, X_train, y_train)
 
-indices_y = collect(1:length(y))
+y_hat_train = ScikitLearn.predict(rf_cl,X_train)
+y_hat_test = ScikitLearn.predict(rf_cl,X_test)
 
-# Split the indices
-X_test, X_train, y_test, y_train = train_test_split(indices_X, indices_y , test_size = 0.9, random_state = 42)
+score_train = ScikitLearn.score(rf_cl, X_train, y_train)
+score_test = ScikitLearn.score(rf_cl, X_test, y_test)
 
-X_test, X_train, y_test, y_train = train_test_split(X, y, test_size= 0.9, stratify=y, random_state = 42)
+###########
+#Getting the confusion matrix
+c_matrix = confusion_matrix(y_hat_train, y_train)
 
-using DecisionTree
+results = TPR_FDR(c_matrix)
 
-model = DecisionTree.RandomForestClassifier(n_trees = 20)
+bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
+title = "Train all data n = $(length(y_train))")
 
-DecisionTree.fit!(model, X_train[:,1:end-1], y_train)
+p_train = bar!(results[:,1], results[:,3], label = "FDR")
 
-y_hat_test = DecisionTree.predict(model, X[X_test,:])
+c_matrix = confusion_matrix(y_hat_test, y_test)
 
-# check accuracy
+results = TPR_FDR(c_matrix)
 
-accuracy = mean(y_hat_test .== y[y_test])
+bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
+title = "Test all data n = $(length(y_test))")
+p_test = bar!(results[:,1], results[:,3], label = "FDR")
 
-# display confusion matrix
-
-confusion_matrix( y_hat_test,y[y_test])
-
-y_prob_test = DecisionTree.predict_proba(model, X_test)
+plot(p_train, p_test)
 
 
-real = y_test
-pred = y_hat_test
-num_classes = 3
-threshold = collect(0.01:0.01:1)
-TPRs = zeros(num_classes, length(threshold))
-FDRs = zeros(num_classes, length(threshold))
-for c in 1:num_classes
-    for j in eachindex(threshold)
-        TP, FP, TN, FN = 0, 0, 0, 0
-        for i in eachindex(y_hat_test)
-            if y_prob_test[i, c] >= threshold[j]
-                if real[i] == pred[i]
-                    TP += 1
-                else
-                    FP += 1
-                end
-            else
-                if real[i] != pred[i]
-                    TN += 1
-                else
-                    FN += 1
-                end
-            end
-        end
-        TPRs[c, j] = TP / (TP + FN)
-        FDRs[c, j] = FP / (TP + FP)
-    end
-end
-FDRs
-# Plot ROC curves for each class
-scatter(FDRs[1,:], TPRs[1,:],
-title = "ROC curve even split %B mobile phase",
-xlabel = "FDR", ylabel = "TPR", 
-label = "Mobile", 
-dpi = 300, zcolor = threshold, colorbar_title = "Prob. threshold",
-xlims = (0,1), ylims = (0,1))
-scatter!(FDRs[2,:], TPRs[2,:], label = "Non-mobile")
-scatter!(FDRs[3,:], TPRs[3,:], label = "Very mobile")
-plot!(threshold, threshold, linestyle = :dash, label = false)
+########
+#Checking feature importances
+importance = rf_cl.feature_importances_
 
-y_test[compounds]
-y_hat_test
-y_test
+sorted_importance = sortperm(importance, rev = true)
 
-compounds = []
-for i in eachindex(y_test)
-    if y_test[i] == "Very mobile"
-        push!(compounds, i)
-    end
-end
-compounds
+labels = All_keys[sorted_importance]
 
-println(Final_table_unique[indices_RPLC,:][shuffle_indices,:][y_test,:][compounds,:][:,:])
+bar(labels[1:15],sort(importance, rev = true)[1:15],
+xrotation=30, 
+dpi = 300,
+title = "RPLC important variables Classification", 
+bottom_margin = 8Plots.mm,
+legend = false)
 

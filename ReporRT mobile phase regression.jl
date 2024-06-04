@@ -323,24 +323,24 @@ rf_regressor = RandomForestRegressor(n_estimators = df_results_3.n_estimators[in
                                      min_samples_split = df_results_3.min_samples_split[ind_best], min_samples_leaf = 1, random_state = 42, n_jobs = -1)
 
 #Manually
-rf_regressor = RandomForestRegressor(n_estimators = 10, criterion = "squared_error", 
+rf_regressor = RandomForestRegressor(n_estimators = 15, criterion = "squared_error", 
                                      min_samples_split = 2, min_samples_leaf = 1, random_state = 42, n_jobs = -1)
 
-ScikitLearn.fit!(rf_regressor, X[model,:], y[model])
+ScikitLearn.fit!(rf_regressor, X_train, y_train)
 
-y_hat_train = ScikitLearn.predict(rf_regressor,X[model,:])
-y_hat_test = ScikitLearn.predict(rf_regressor,X[test_final,:])
+y_hat_train = ScikitLearn.predict(rf_regressor,X_train)
+y_hat_test = ScikitLearn.predict(rf_regressor,X_test)
 
-score_train = ScikitLearn.score(rf_regressor, X[model,:], y[model])
-score_test = ScikitLearn.score(rf_regressor, X[test_final,:], y[test_final])
+score_train = ScikitLearn.score(rf_regressor, X_train, y_train)
+score_test = ScikitLearn.score(rf_regressor, X_test, y_test)
 
-scatter(y[model], y_hat_train, 
+scatter(y_train, y_hat_train, 
 label = "train = $(round(score_train, digits= 2))", 
 dpi = 300,
 title = "Random forest regression RPLC data",
 xlabel = "Test %B Mobile phase",
 ylabel = "Predicted %B Mobile phase")
-scatter!(y[test_final],y_hat_test, label = "test = $(round(score_test, digits= 2))")
+scatter!(y_test,y_hat_test, label = "test = $(round(score_test, digits= 2))")
 
 importance = rf_regressor.feature_importances_
 

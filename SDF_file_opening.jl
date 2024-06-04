@@ -40,7 +40,6 @@ function convert_to_csv(data, output_file)
     instruments = get(data, "<INSTRUMENT", [""])
     num_peaks = get(data, "<NUM PEAKS", [""])
     mass_spectral_peaks = get(data, "<MASS SPECTRAL PEAKS", [[""]])  # Default value in case not found
-    mass_spectral_peaks[999:1050]
     mass = Vector{Vector{String}}(undef, length(namess))
     mass[1] = mass_spectral_peaks[1:parse(Int, num_peaks[1])]
 
