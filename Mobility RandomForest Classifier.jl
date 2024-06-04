@@ -231,13 +231,8 @@ indices_3 = findall(x-> x == 3, clusters)
 histogram(Final_table_unique[indices_RPLC,end-1][indices_1], xlims = (0,1))
 histogram!(Final_table_unique[indices_RPLC,end-1][indices_2], xlims = (0,1))
 histogram!(Final_table_unique[indices_RPLC,end-1][indices_3], xlims = (0,1), legend = false)
-# Print the results
-println("Cluster assignments: ", clusters)
-println("Centroids: ", centroids)
-y = clusters
-# Visualize the results
-scatter(X[:, 1], X[:, 2], group=clusters, legend=false)
-scatter!(centroids[:, 1], centroids[:, 2], ms=2, mc=:black)
+
+
 y = []
 for i in eachindex(p_b)
     if p_b[i] >= 0.6
@@ -249,7 +244,6 @@ for i in eachindex(p_b)
     end
 end
 
-
 shuffle_indices = shuffle(collect(1:length(y)))
 
 X = X[shuffle_indices,:]
@@ -258,17 +252,17 @@ y = y[shuffle_indices]
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, stratify=y, random_state = 42)
 
-
+X_train
 #Manual Hyperparameter optimisation for ScikitLearn RF
-rf_cl = RandomForestClassifier(n_estimators = 10, random_state = 42)
+rf_cl = RandomForestClassifier(n_estimators = 15, random_state = 42)
 
-ScikitLearn.fit!(rf_cl, X_train[:,1:end-1], y_train)
+ScikitLearn.fit!(rf_cl, X_train, y_train)
 
-y_hat_train = ScikitLearn.predict(rf_cl,X_train[:,1:end-1])
-y_hat_test = ScikitLearn.predict(rf_cl,X_test[:,1:end-1])
+y_hat_train = ScikitLearn.predict(rf_cl,X_train)
+y_hat_test = ScikitLearn.predict(rf_cl,X_test)
 
-score_train = ScikitLearn.score(rf_cl, X_train[:,1:end-1], y_train)
-score_test = ScikitLearn.score(rf_cl, X_test[:,1:end-1], y_test)
+score_train = ScikitLearn.score(rf_cl, X_train, y_train)
+score_test = ScikitLearn.score(rf_cl, X_test, y_test)
 
 confusion_matrix(y_hat_test, y_test)
 
@@ -278,7 +272,7 @@ sorted_importance = sortperm(importance, rev = true)
 
 labels = All_keys[sorted_importance]
 
-bar(labels[1:15],sort(importance, rev = true)[1:15],
+bar(labels,sort(importance, rev = true),
 xrotation=30, 
 dpi = 300,
 title = "RPLC important variables Classification", 
@@ -286,7 +280,7 @@ bottom_margin = 8Plots.mm,
 legend = false)
 
 # Get predicted probabilities for test set
-y_prob_test = ScikitLearn.predict_proba(rf_cl, X_test)
+y_prob_test = ScikitLearn.predict_proba(rf_cl, X_test[:,1:end-1])
 
 real = y_test
 pred = y_hat_test
@@ -301,13 +295,13 @@ threshold = collect(0.01:0.01:1)
 
 num_classes = 3
 
-TPRs = zeros(num_classes, length(threshold))
-FDRs = zeros(num_classes, length(threshold))
+TPRs = zeros(length(threshold), num_classes)
+FDRs = zeros(length(threshold), num_classes)
 for c in 1:num_classes
-    for j in eachindex(threshold)
+    for t in eachindex(threshold)
         TP, FP, TN, FN = 0, 0, 0, 0
         for i in eachindex(y_hat_test)
-            if y_prob_test[i, c] >= threshold[j]
+            if y_prob_test[i, c] >= threshold[t]
                 if real[i] == pred[i]
                     TP += 1
                 else
@@ -321,19 +315,19 @@ for c in 1:num_classes
                 end
             end
         end
-        TPRs[c, j] = TP / (TP + FN)
-        FDRs[c, j] = FP / (TP + FP)
+        TPRs[t, c] = TP / (TP + FN)
+        FDRs[t, c] = FP / (TP + FP)
     end
 end
-
+TPRs
 # Plot ROC curves for each class
-scatter(FPRs[1,:], TPRs[1,:],
+scatter(FDRs[:,1], TPRs[:,1],
 title = "ROC curve even split %B mobile phase",
 xlabel = "FDR", ylabel = "TPR", 
 label = "Mobile", 
 dpi = 300)
-scatter!(FPRs[2,:], TPRs[2,:], label = "Non-mobile")
-scatter!(FPRs[3,:], TPRs[3,:], label = "Very mobile")
+scatter!(FDRs[:,2], TPRs[:,2], label = "Non-mobile")
+scatter!(FDRs[:,3], TPRs[:,3], label = "Very mobile")
 plot!(threshold, threshold, linestyle = :dash, label = false)
 
 rf_cl.classes_
@@ -341,16 +335,31 @@ rf_cl.classes_
 
 compounds = []
 for i in eachindex(y_test)
-    if y_test[i] == "Very mobile" && y_hat_test[i] == "Non-mobile"
+    if y_test[i] == "Non-mobile" && y_hat_test[i] == "Very mobile"
         push!(compounds, i)
     end
 end
 compounds
 
-wrong_compounds = X[compounds,end]
+wrong_compounds = X_test[compounds,end]
 
-println(Final_table_unique[indices_RPLC,:][wrong_compounds,:])
+println(Final_table_unique[indices_RPLC,:][wrong_compounds,1][4])
+println(Final_table_unique[indices_RPLC,:][wrong_compounds,5][4])
+println(Final_table_unique[indices_RPLC,:][wrong_compounds,6][4])
+println(Final_table_unique[indices_RPLC,:][wrong_compounds,end][4])
 
+indices_interest = findall(x-> x == "InChI=1S/C7H6O3/c8-6-3-1-5(2-4-6)7(9)10/h1-4,8H,(H,9,10)",
+Final_table_unique[indices_RPLC,1])
 
-
+mm = Final_table_unique[indices_RPLC,:][indices_interest,end]./100
+muh = Final_table_unique[indices_RPLC,:][indices_interest,end-1]
+scatter(mm, dpi = 300,
+title = " 4-hydroxybenzoic acid ",
+xlabel = "Ocurrence",
+ylabel = "ϕ / retention factor",
+ylims = (0,1),
+label = "ϕ")
+scatter!(muh, dpi = 300,
+label = "Retention factor",
+ylims = (0,1))
 
