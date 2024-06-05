@@ -212,26 +212,8 @@ p_b = Final_table_unique[indices_RPLC,end]./100
 #Shuffling data and creating classes
 Random.seed!(42)
 X = [MACCS PubChem_fps]
-
+X = [MACCS PubChem_fps][indices_RPLC,:]
 X = [X[indices_RPLC,:] collect(1:length(indices_RPLC))]
-
-# Set the number of clusters
-k = 3
-
-# Perform k-means clustering
-result = kmeans(X', k)
-
-# Extract the results
-clusters = result.assignments  # Cluster assignments for each data point
-centroids = result.centers     # Centroids of the clusters
-
-indices_1 = findall(x-> x == 1, clusters)
-indices_2 = findall(x-> x == 2, clusters)
-indices_3 = findall(x-> x == 3, clusters)
-histogram(Final_table_unique[indices_RPLC,end-1][indices_1], xlims = (0,1))
-histogram!(Final_table_unique[indices_RPLC,end-1][indices_2], xlims = (0,1))
-histogram!(Final_table_unique[indices_RPLC,end-1][indices_3], xlims = (0,1), legend = false)
-
 
 y = []
 for i in eachindex(p_b)
@@ -243,18 +225,13 @@ for i in eachindex(p_b)
         push!(y, "Mobile")
     end
 end
-
-shuffle_indices = shuffle(collect(1:length(y)))
-
-X = X[shuffle_indices,:]
-
-y = y[shuffle_indices]
+y
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, stratify=y, random_state = 42)
 
 X_train
 #Manual Hyperparameter optimisation for ScikitLearn RF
-rf_cl = RandomForestClassifier(n_estimators = 15, random_state = 42)
+rf_cl = RandomForestClassifier(n_estimators = 20, random_state = 42)
 
 ScikitLearn.fit!(rf_cl, X_train, y_train)
 
@@ -272,7 +249,7 @@ sorted_importance = sortperm(importance, rev = true)
 
 labels = All_keys[sorted_importance]
 
-bar(labels,sort(importance, rev = true),
+bar(labels[1:15],sort(importance, rev = true)[1:15],
 xrotation=30, 
 dpi = 300,
 title = "RPLC important variables Classification", 
