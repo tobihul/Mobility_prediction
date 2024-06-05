@@ -155,21 +155,15 @@ function remove_high_std(RPLC_data, std_threshold)
 
     standard_devs = []
 
-    standard_devs_2 = []
-
     for i in eachindex(unique_compounds)
         if i % 100 == 0
             println("$(round(i/length(unique_compounds)*100, digits = 2))%")
         end
 
-        occurrences = findall(x-> x == unique_compounds[i], Final_table_unique[indices_RPLC,1])
+        occurrences = findall(x-> x == unique_compounds[i],RPLC_data[:,1])
 
-        if length(occurrences) > 0
-
-            push!(standard_devs,std(Final_table_unique[indices_RPLC,end][occurrences]./100))
-
-            push!(standard_devs_2,std(Final_table_unique[indices_RPLC,end-1][occurrences]))
-        end
+        push!(standard_devs,std(RPLC_data[occurrences,end]./100))
+    
     end
 
     high_std_cmp = unique_compounds[findall(x-> x>=std_threshold, standard_devs)]
@@ -182,11 +176,9 @@ end
 function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
     fingerprints = [MACCS PubChem_fps]
 
-    p_b = filtered_RPLC_data[:,end]./100
-
     unique_compounds = unique(filtered_RPLC_data[:,1])
 
-    train, test = train_test_split(unique_compounds, test_size = split, random_state = 42)
+    p_b = filtered_RPLC_data[:,end]./100
 
     y = []
     for i in eachindex(p_b)
@@ -198,6 +190,22 @@ function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
             push!(y, "Mobile")
         end
     end
+
+    index_first_occurrence = Vector{Int}(undef, length(unique_compounds))
+
+    for i in eachindex(unique_compounds)
+
+        if (i % 100) == 0
+            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
+        end
+        index_first_occurrence[i] = findfirst(x-> x == unique_compounds[i], filtered_RPLC_data[:,1])
+
+    end
+
+    strat_labels = y[index_first_occurrence]
+    
+    train, test = train_test_split(unique_compounds, test_size = split, random_state = 42, stratify = strat_labels)
+    
     # Initialize variables
     train_indices = []
     test_indices = []
@@ -223,7 +231,30 @@ function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
 
     return X_train, X_test, y_train, y_test
 end
+function remove_outliers_IQR(RPLC_data)
+    unique_compounds = unique(RPLC_data[:,1])
 
+    non_outliers = []
+    for i in eachindex(unique_compounds)
+        if i % 100 == 0
+            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
+        end
+
+        occurrences = findall(x-> x == unique_compounds[i],RPLC_data[:,1])
+        group = RPLC_data[occurrences,end]./100
+        Q1 = quantile(group, 0.25)
+        Q3 = quantile(group, 0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        indices_non_outliers = occurrences[(group .>= lower_bound) .& (group .<= upper_bound)]
+        append!(non_outliers, indices_non_outliers)
+    end
+
+    filtered_RPLC_data = RPLC_data[non_outliers,:]
+
+    return filtered_RPLC_data
+end
 for i = 1:374
     #Locating the file
     current_file = joinpath("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\processed_data", readdir(folder_path)[i])
@@ -234,21 +265,22 @@ for i = 1:374
     Compound_Inchi = data_compounds[:,6]
     RT = data_compounds[:,4]
 
-     #Getting the retention factors
-     gradient_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "gradient.tsv"],"_"))
-     gradient = CSV.read(gradient_path, DataFrame)
-     local retention_factors
-     Modifier = []
-     try 
+    #Getting the retention factors
+    gradient_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "gradient.tsv"],"_"))
+    gradient = CSV.read(gradient_path, DataFrame)
+    local retention_factors
+    Modifier = []
+    try 
         run_time = gradient[end,1]
         retention_factors = RT./run_time
         for rtfs in retention_factors
             push!(Modifier, interpolate_B_modifier(rtfs, gradient))
         end
-     catch
-         retention_factors = repeat(["Not gradient info"], length(RT))
-         Modifier = repeat(["Not gradient info"], length(RT))
-     end
+
+    catch
+         retention_factors = repeat(["No gradient info"], length(RT))
+         Modifier = repeat(["No gradient info"], length(RT))
+    end
     #Getting the MACCS
     MACCS_path = joinpath(current_file, join(["$(readdir(folder_path)[1:end-1][i])", "fingerprints_maccs_canonical_success.tsv"],"_"))
     MACCS_info = CSV.read(MACCS_path, DataFrame)
@@ -289,7 +321,6 @@ for i = 1:374
 end
 
 Final_table
-
 #Removing compounds that occur both in RPLC and HILIC 
 Final_table_unique = remove_overlapping(Final_table)
 
@@ -301,21 +332,30 @@ MACCS, PubChem_fps = format_fingerprints(Final_table_unique)
 
 #Getting indices for RPLC and HILIC rows
 indices_RPLC = findall(row -> occursin("RP", row.LC_mode), eachrow(Final_table_unique))
-indices_HILIC = findall(row -> occursin("HILIC", row.LC_mode), eachrow(Final_table_unique))
 
 RPLC_data = Final_table_unique[indices_RPLC,:]
 
 #############################################################################################################
 #Removing if std > 0.3
 
-@time filtered_RPLC_data = remove_high_std(RPLC_data, 1)
+@time filtered_RPLC_data = remove_high_std(RPLC_data, 0.4)
 filtered_RPLC_data
 MACCS, PubChem_fps = format_fingerprints(filtered_RPLC_data)
 MACCS
 PubChem_fps
 
 #############################################################################################################
+#Removing outliers instead of std > threshold
+@time filtered_RPLC_data = remove_outliers_IQR(RPLC_data)
+filtered_RPLC_data
+MACCS, PubChem_fps = format_fingerprints(filtered_RPLC_data)
+MACCS
+PubChem_fps
+
+
+#############################################################################################################
 #Train/test split without data leakage
+
 
 X_train, X_test, y_train, y_test = train_test_split_no_leakage_classifier(filtered_RPLC_data, 0.1)
 
@@ -339,7 +379,7 @@ c_matrix = confusion_matrix(y_hat_train, y_train)
 results = TPR_FDR(c_matrix)
 
 bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
-title = "Train all data n = $(length(y_train))")
+title = "Train without outliers n = $(length(y_train))")
 
 p_train = bar!(results[:,1], results[:,3], label = "FDR")
 
@@ -348,11 +388,14 @@ c_matrix = confusion_matrix(y_hat_test, y_test)
 results = TPR_FDR(c_matrix)
 
 bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
-title = "Test all data n = $(length(y_test))")
+title = "Test without outliers n = $(length(y_test))")
 p_test = bar!(results[:,1], results[:,3], label = "FDR")
 
 plot(p_train, p_test)
 
+cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
+savefig("Outlier removal boxplot.png")
+cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
 
 ########
 #Checking feature importances
@@ -368,4 +411,7 @@ dpi = 300,
 title = "RPLC important variables Classification", 
 bottom_margin = 8Plots.mm,
 legend = false)
+
+##############################
+#Taking out outliers
 
