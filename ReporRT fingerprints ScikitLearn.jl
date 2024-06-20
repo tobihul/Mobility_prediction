@@ -99,11 +99,11 @@ function custom_binning(y, num_bins)
     min_val = minimum(y)
     max_val = maximum(y)
     bin_width = (max_val - min_val) / num_bins
-    bins = Array{Int}(undef, length(y))
+    bins = Array{String}(undef, length(y))
     
     for i in 1:length(y)
         bin_index = ceil(Int, (y[i] - min_val) / bin_width)
-        bins[i] = min(bin_index, num_bins)
+        bins[i] = string( min(bin_index, num_bins))
     end
     
     return bins
@@ -122,6 +122,65 @@ function Stratifiedcv(X, groups, n_folds)
         test_indices[i] = test_idx .+ 1  # Adjust for 1-based indexing
     end
     return train_indices, test_indices
+end
+function train_test_split_no_leakage_regressor(filtered_RPLC_data, split)
+    fingerprints = PubChem_fps
+
+    unique_compounds = unique(filtered_RPLC_data[:,1])
+
+    index_first_occurrence = Vector{Int}(undef, length(unique_compounds))
+
+    train, test = train_test_split(unique_compounds, test_size = 0.1, random_state = 42)
+    
+    # Initialize variables
+    train_indices = []
+    test_indices = []
+
+    # Find indices for train and test data
+    @time for i in eachindex(unique_compounds)
+        if (i % 100) == 0
+            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
+        end
+        occurrences = findall(x -> x == unique_compounds[i], filtered_RPLC_data[:,1])
+        if unique_compounds[i] in train
+            append!(train_indices, occurrences)
+        else
+            append!(test_indices, occurrences)
+        end
+    end
+
+    r_f = filtered_RPLC_data[:,end-1]
+    # Extract train and test data
+    X_train = fingerprints[train_indices, :]
+    X_test = fingerprints[test_indices, :]
+    y_train = r_f[train_indices]
+    y_test = r_f[test_indices]
+
+    return X_train, X_test, y_train, y_test, train_indices, test_indices, y
+end
+function remove_outliers_IQR(RPLC_data)
+    unique_compounds = unique(RPLC_data[:,1])
+
+    non_outliers = []
+    for i in eachindex(unique_compounds)
+        if i % 100 == 0
+            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
+        end
+
+        occurrences = findall(x-> x == unique_compounds[i],RPLC_data[:,1])
+        group = RPLC_data[occurrences,end]./100
+        Q1 = quantile(group, 0.25)
+        Q3 = quantile(group, 0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        indices_non_outliers = occurrences[(group .>= lower_bound) .& (group .<= upper_bound)]
+        append!(non_outliers, indices_non_outliers)
+    end
+
+    filtered_RPLC_data = RPLC_data[non_outliers,:]
+
+    return filtered_RPLC_data
 end
 for i = 1:374
     #Locating the file
@@ -188,7 +247,6 @@ for i = 1:374
 end
 
 Final_table
-
 #Removing compounds that occur both in RPLC and HILIC 
 Final_table_unique = remove_overlapping(Final_table)
 
@@ -200,8 +258,20 @@ MACCS, PubChem_fps = format_fingerprints(Final_table_unique)
 
 #Getting indices for RPLC and HILIC rows
 indices_RPLC = findall(row -> occursin("RP", row.LC_mode), eachrow(Final_table_unique))
-indices_HILIC = findall(row -> occursin("HILIC", row.LC_mode), eachrow(Final_table_unique))
 
+RPLC_data = Final_table_unique[indices_RPLC,:]
+
+#############################################################################################################
+#Removing outliers if IQR > 1.5 * threshold
+@time filtered_RPLC_data = remove_outliers_IQR(RPLC_data)
+filtered_RPLC_data
+MACCS, PubChem_fps = format_fingerprints(filtered_RPLC_data)
+MACCS
+PubChem_fps
+
+#Train/test split without data leakage
+
+X_train, X_test, y_train, y_test, train_indices, test_indices, y = train_test_split_no_leakage_regressor(filtered_RPLC_data, 0.1)
 ###########################################################################################################
 #Random forest classification
 Random.seed!(42)
@@ -212,27 +282,11 @@ X = (X[indices_RPLC,:])
 
 y = Float64.(Final_table_unique[:,end][indices_RPLC]./100)
 
-shuffle_indices = shuffle(collect(1:length(y)))
-
-X = X[shuffle_indices,:]
-
-y = y[shuffle_indices]
-
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.1, random_state = 42)
 
-classes_test= []
-for i in eachindex(y_test)
-    if y_test[i] >= 0.6
-        push!(classes_before, "Non-mobile")
-    elseif y_test[i] <= 0.2
-        push!(classes_before, "Very mobile")
-    else 
-        push!(classes_before, "Mobile")
-    end
-end
 #######################
 #Manual Hyperparameter optimisation for ScikitLearn RF
-n_estimators_t = 15
+n_estimators_t = 20
 
 criterion = "squared_error"
 
@@ -317,7 +371,7 @@ rf_regressor = RandomForestRegressor(n_estimators = df_results_3.n_estimators[in
                                      min_samples_split = df_results_3.min_samples_split[ind_best], min_samples_leaf = 1, random_state = 42, n_jobs = -1)
 
 #Manually
-rf_regressor = RandomForestRegressor(n_estimators = 15, criterion = "squared_error", 
+rf_regressor = RandomForestRegressor(n_estimators = 20, criterion = "squared_error", 
                                      min_samples_split = 2, min_samples_leaf = 1, random_state = 42, n_jobs = -1)
 
 ScikitLearn.fit!(rf_regressor, X_train, y_train)
@@ -328,7 +382,7 @@ y_hat_test = ScikitLearn.predict(rf_regressor,X_test)
 score_train = ScikitLearn.score(rf_regressor, X_train, y_train)
 score_test = ScikitLearn.score(rf_regressor, X_test, y_test)
 
-scatter(y_train, y_hat_train, label = "train = $(round(score_train, digits= 2))", xlims = (0,1), ylims = (0,1), dpi = 300)
+scatter(y_train, y_hat_train, label = "train = $(round(score_train, digits= 2))", dpi = 300)
 scatter!(y_test,y_hat_test, label = "test = $(round(score_test, digits= 2))")
 
 importance = rf_regressor.feature_importances_
