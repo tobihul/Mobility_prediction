@@ -1,5 +1,5 @@
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots, MultivariateStats, Images
-using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLDataUtils
+using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLBase
 using ScikitLearn: @sk_import
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
@@ -8,7 +8,7 @@ folder_path = "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Doc
 Final_table = DataFrame(Inchikey = String[], LC_mode = String7[], MACCS = String[], Pubchem_fps = String[],MW = Float64[], XlogP = Float64[], Retention_factors = Float64[], Modifier = Float64[] )
 MACCS_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\MACCS keys.txt")
 PubChem_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\PubChem keys.txt")
-All_keys =  [MACCS_keys ;PubChem_keys]
+All_keys =  [PubChem_keys; MACCS_keys]
 All_keys_log_MW = [MACCS_keys ;PubChem_keys;"MW"]
 function interpolate_B_modifier(time::Float64, gradient::DataFrame)
     times = gradient[:,1]./run_time
@@ -24,29 +24,6 @@ function interpolate_B_modifier(time::Float64, gradient::DataFrame)
         B1, B2 = gradient[:,3][idx], gradient[:,3][idx+1]
         return B1 + (B2 - B1) * (time - t1) / (t2 - t1)
     end
-end
-function calculate_leverage(X,x)
-    leverage = zeros(length(x[:,1]))
-    b = pinv(X'*X)
-    for i = 1:length(x[:,1])
-        leverage[i] = pinv(x[i,:]) * b * x[i,:] 
-    end
-    return leverage
-end
-function remove_overlapping(Results_table)
-
-    # Separate entries with RP and HILIC modes
-    rp_Inchikey = Results_table[Results_table.LC_mode .== "RP", :].Inchikey
-    hilic_Inchikey = Results_table[Results_table.LC_mode .== "HILIC", :].Inchikey
-
-    # Find the intersection of CIDss for both modes
-    common_Inchikey = intersect(rp_Inchikey, hilic_Inchikey)
-
-    #Removing the ones that have been separated by both as we already have them
-    condition = in.(Results_table.Inchikey, Ref(common_Inchikey))
-    Final_table_unique = Results_table[.!condition, :]
-
-    return Final_table_unique
 end
 function remove_missing_and_outliers(Results_unique)
     #This removes rows that have missing retention factors due to no gradient data or other 
@@ -95,34 +72,6 @@ function format_fingerprints(Final_table_unique)
         end
     end
     return MACCS, Pubchem_fps
-end
-function custom_binning(y, num_bins)
-    min_val = minimum(y)
-    max_val = maximum(y)
-    bin_width = (max_val - min_val) / num_bins
-    bins = Array{Int}(undef, length(y))
-    
-    for i in 1:length(y)
-        bin_index = ceil(Int, (y[i] - min_val) / bin_width)
-        bins[i] = min(bin_index, num_bins)
-    end
-    
-    return bins
-end
-function Stratifiedcv(X, groups, n_folds)
-    # Initialize StratifiedKFold
-    skf = StratifiedKFold(n_splits=n_folds)
-
-    # Initialize variables to store indices for each fold
-    train_indices = Vector{Vector{Int}}(undef, n_folds)
-    test_indices = Vector{Vector{Int}}(undef, n_folds)
-
-    # Iterate over the splits and store indices for each fold
-    for (i, (train_idx, test_idx)) in enumerate(skf.split(X, groups))
-        train_indices[i] = train_idx .+ 1  # Adjust for 1-based indexing
-        test_indices[i] = test_idx .+ 1  # Adjust for 1-based indexing
-    end
-    return train_indices, test_indices
 end
 function TPR_FDR(c_matrix)
     TP_M = c_matrix[1,1]
@@ -178,7 +127,7 @@ function remove_high_std(RPLC_data, std_threshold)
 
 end
 function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
-    fingerprints = [MACCS PubChem_fps]
+    fingerprints = [PubChem_fps MACCS]
 
     #fingerprints = fingerprints .- mean(fingerprints,dims = 1)
 
@@ -367,196 +316,83 @@ rf_cl = RandomForestClassifier(n_estimators = 100, max_features = 1, random_stat
 
 
 ScikitLearn.fit!(rf_cl, X_train, y_train)
-depths = [maximum([tree.tree_.max_depth for tree in rf_cl.estimators_]) for _ in 1:length(rf_cl.estimators_)]
+
+# List of InChI keys for the chemicals of interest
+InChI_REACH = CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\S36_UBAPMT_April2022.csv", DataFrame).Single_Constituent_InChI
+FPs_REACH = Int.(Matrix(CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\REACH fingerprints.csv", DataFrame)))
+classes =  CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\S36_UBAPMT_April2022.csv", DataFrame).M_Rationale # Replace with your actual InChI keys
+
+# Define a regular expression pattern to match "vM", "M", or "Pot. M/vM"
+pattern = r"(v?M(?:\/vM)?).*"
+
+# Initialize an empty vector to store the extracted parts
+extracted_parts = String[]
+
+# Iterate over each string and extract the desired part
+for str in classes
+    if startswith(str, "v")
+        push!(extracted_parts, "Very mobile")
+    elseif startswith(str, "M")
+        push!(extracted_parts, "Mobile")
+    elseif startswith(str, "Pot. M/vM")
+        push!(extracted_parts, "Mobile")
+    elseif startswith(str, "Not")
+        push!(extracted_parts, "Non-mobile")
+    end
+end
+
+
+extracted_parts
+
+
+# Save the final results to a CSV file
+CSV.write("filtered_chemicals.csv", final_results)
+
 y_hat_train = ScikitLearn.predict(rf_cl,X_train)
 y_hat_test = ScikitLearn.predict(rf_cl,X_test)
 
 score_train = ScikitLearn.score(rf_cl, X_train, y_train)
 score_test = ScikitLearn.score(rf_cl, X_test, y_test)
+y_hat_REACH = ScikitLearn.predict(rf_cl,FPs_REACH)
+importance = rf_cl.feature_importances_
 
+sorted_importance = sortperm(importance, rev = true)
 
-###########
-#Getting the confusion matrix
-c_matrix = confusion_matrix(y_hat_train, y_train)
+labels = All_keys[sorted_importance]
 
-results = TPR_FDR(c_matrix)
-
-#bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
-#title = "Train without outliers n = $(length(y_train))", titlefont = font(10))
-
-#p_train = bar!(results[:,1], results[:,3], label = "FDR")
-
-scatter([1,2,3], results[:,2], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
-label = "TPR", shape = :diamond, xlims = (0.5,3.5), grid = :y, markersize = 4,
-title = "Training data n = $(length(y_train))", titlefont = font(10),
+bar(labels[1:15],sort(importance, rev = true)[1:15],
+xrotation=30, 
+dpi = 300,
+title = "RPLC important variables Classification", 
+bottom_margin = 8Plots.mm,
 legend = false)
 
-scatter!([1,2,3], results[:,3], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
-label = "FDR", shape = :square, markersize = 4)
-
-p_train = scatter!([1,2,3], results[:,4], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
-label = "F1 score", shape = :utriangle, dpi = 300, markersize = 4)
-
-c_matrix = confusion_matrix(y_hat_test, y_test)
+c_matrix = confusion_matrix(y_hat_REACH, extracted_parts)
 
 results = TPR_FDR(c_matrix)
 
-#bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
-#title = "Test without outliers n = $(length(y_test))",titlefont = font(10))
-#p_test = bar!(results[:,1], results[:,3], label = "FDR")
-
 scatter([1,2,3], results[:,2], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
 label = "TPR", shape = :diamond, xlims = (0.5,3.5), grid = :y, markersize = 4,
-title = "Test data n = $(length(y_test))", titlefont = font(10))
-
+title = "Test data n = $(length(y_hat_REACH))", titlefont = font(10))
 scatter!([1,2,3], results[:,3], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
 label = "FDR", shape = :square, markersize = 4)
 
 p_test = scatter!([1,2,3], results[:,4], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
 label = "F1 score", shape = :utriangle, dpi = 300, markersize = 4)
 
-
-plot(p_train, p_test, size = (800,400), dpi = 300)
-
-cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
-savefig("Importance model all data.png")
-cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
-
-########
-#Checking feature importances
-importance = rf_cl.feature_importances_
-
-sorted_importance = sortperm(importance, rev = true)
-
-labels = All_keys_log_MW[sorted_importance]
-
-bar(labels[1:end],sort(importance, rev = true)[1:end],
-xrotation=30, 
-dpi = 300,
-title = "RPLC important variables Classification", 
-bottom_margin = 8Plots.mm,
-legend = false)
-#179 141 128
-findfirst(x-> x == labels, All_keys)
-ind = findall(x-> x =="Very mobile", y_train)
-scatter(X_test[indices,179].+(rand(length(indices))./1.1), X_test[indices,128].+(rand(length(indices))./1.1), group = y_test[indices],
-xlabel = "> 12C", ylabel = "C-C-C-C-C-C-C-C", dpi = 300, markersize = 2.5,
-title = " Wrongly classified as mobile")
-##############################
-#Tracking misclassifications
-
 indices = []
-for i in eachindex(y_test)
-    if y_test[i] == "Non-mobile" && y_hat_test[i] == "Mobile"
+for i in eachindex(extracted_parts)
+    if extracted_parts[i] == "Very mobile" && y_hat_REACH[i] == "Non-mobile"
         push!(indices, i)
     end
 end
 indices
 
-cmp_indices = test_indices[indices]
-
-
-Inchi = filtered_RPLC_data[cmp_indices,1]
-RTs = filtered_RPLC_data[cmp_indices,end-1]
-p_bs = filtered_RPLC_data[cmp_indices,end]
-filtered_RPLC_data[cmp_indices,6][131]
-filtered_RPLC_data[cmp_indices,end-1][131]
-filtered_RPLC_data[cmp_indices,end][131]
-histogram(p_bs, bins = 10)
-
-cmps = findall(x-> x == Inchi, filtered_RPLC_data[:,1])
-
-scatter(filtered_RPLC_data[cmps,end]./100, ylims = (0,1),
-dpi = 300, title = "PROCAINAMIDE")
-
-
-scatter(RTs, Inchi,  dpi = 300,
-title = "Very mobile misclassified as mobile",
-ylabel = "ϕ",
-xlabel = "Retention factor",
-legend = false)
-
-scatter!(RTs, dpi = 300,
-title = "Very mobile misclassified as mobile",
-ylabel = "%B elution",
-xlabel = "N compound",
-label = "Retention factor")
 
 
 
-sum(y_train.=="Very mobile")/length(y_train)
-sum(y_train.=="Non-mobile")/length(y_train)
-sum(y_train.=="Mobile")/length(y_train)
-
-sum(y_test.=="Very mobile")/length(y_test)
-sum(y_test.=="Non-mobile")/length(y_test)
-sum(y_test.=="Mobile")/length(y_test)
+searchd = findall(x-> x == InChI_REACH[indices][28], filtered_RPLC_data[:,1])
 
 
-n_estimators_t = [20, 50]
-
-criterion = "gini"
-
-max_depth_t = [50, 1000]
-
-min_samples_split_t = [2,4,6]
-
-min_samples_leaf_t = [1,4,6]
-
-random_state = 42
-
-f_name = "Random forest classifier final"
-
-df_results_3 = DataFrame(n_estimators = Int[], min_samples_split = Int[], min_samples_leaf = Int[], train_score = Float64[], test_score = Float64[])
-
-df_results_3 = CSV.read("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", DataFrame)
-
-get_params(rf_cl)
-
-#StratifiedKFold
-bins = 10
-k = 3
-classes = custom_binning(y[model], bins)
-
-histogram(classes, xticks = (1:bins),
-dpi = 300,
-label = false,
-title = "Binning of retention factors for Stratification")
-
-train, test = Stratifiedcv(X[model,:], classes, k)
-
-for n_estimators in n_estimators_t
-    @show n_estimators
-        for min_samples_split in min_samples_split_t
-            @show min_samples_split
-            for min_samples_leaf in min_samples_leaf_t
-                @show min_samples_leaf
-                scores_train = zeros(k)
-                scores_test = zeros(k)
-                for fold = collect(1:k)
-                    #train_fold = kf.train_indices[fold]
-                    #val_fold = kf.val_indices[fold]
-
-                    train_fold = train[fold]
-                    val_fold = test[fold]
-
-                    rf_regressor = RandomForestRegressor(n_estimators = n_estimators, criterion = criterion, 
-                                                        min_samples_split = min_samples_split, min_samples_leaf = min_samples_leaf, random_state = random_state, n_jobs = -1)
-
-                    ScikitLearn.fit!(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
-
-                    scores_train[fold] = ScikitLearn.score(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
-                    scores_test[fold] = ScikitLearn.score(rf_regressor, X[model, :][val_fold,:], y[model][val_fold])
-                end
-                score_train_cv = mean(scores_train)
-                score_test_cv = mean(scores_test)
-                @show score_train_cv
-                @show score_test_cv
-                push!(df_results_3, [n_estimators, min_samples_split, min_samples_leaf, score_train_cv, score_test_cv])
-            end
-    end
-end
-
-CSV.write("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", df_results_3)
-
-
+scatter(filtered_RPLC_data[searchd,end]./100, ylims = (0,1), label = "Φ")
+scatter!(filtered_RPLC_data[searchd,end-1], label = "Rf")

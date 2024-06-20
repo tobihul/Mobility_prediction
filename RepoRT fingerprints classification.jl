@@ -217,12 +217,12 @@ vspan!([separator*3, maximum(Final_table_unique[indices_HILIC,7])], color=:red, 
 savefig("C:\\Users\\uqthulle\\Documents\\Plots\\RPLC space with organic modifier.png")
 
 Final_table_unique
-histogram(Final_table_unique[indices_RPLC,8]./100, title = "Classification of RPLC %B",
-dpi = 300, label = false)
+histogram(filtered_RPLC_data[:,end]./100, title = "Classification of RPLC %B",
+dpi = 300, label = false, xlims = (0,1))
 separator = 0.333
-vspan!([0, 0.333], color=:red, alpha=0.3, label = "Very mobile")
-vspan!([0.333, 0.666], color=:darkorange, alpha=0.3, label = "Mobile")
-vspan!([0.666, maximum(Final_table_unique[indices_RPLC,7])], color=:green, alpha=0.3, label = "Non-mobile")
+vspan!([0, 0.2], color=:red, alpha=0.3, label = "Very mobile")
+vspan!([0.2, 0.6], color=:darkorange, alpha=0.3, label = "Mobile")
+vspan!([0.6, 1], color=:green, alpha=0.3, label = "Non-mobile")
 
 
 Table_RPLC = Final_table_unique[indices_RPLC, :]
@@ -335,9 +335,4 @@ outlier_compounds = Final_table_unique[indices_RPLC,:][indices,:]
 CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\Outlier compounds.csv", outlier_compounds)
 
 indices_21 = findall(x-> x=="InChI=1S/C16H14O6/c1-21-13-3-2-8(4-10(13)18)14-7-12(20)16-11(19)5-9(17)6-15(16)22-14/h2-6,14,17-19H,7H2,1H3", Final_table_unique[indices_RPLC,1])
-
-Final_table_unique[indices_RPLC,end-1:end][indices_21,:]
-
-
-
 
