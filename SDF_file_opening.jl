@@ -33,6 +33,8 @@ end
 function convert_to_csv(data, output_file)
     # Extract relevant information
     namess = get(data, "<NAME", [""])
+    CASNO = get(data, "<CASNO", [""])
+    formula = get(data, "<FORMULA", [""])
     mws = get(data, "<MW", [""])
     precursor_mzs = get(data, "<PRECURSOR M/Z", [""])
     collision_energies = get(data, "<COLLISION ENERGY", [""])
@@ -51,10 +53,11 @@ function convert_to_csv(data, output_file)
         end_index = current_index
         mass[i] = mass_spectral_peaks[start_index:end_index]
     end
-    mass[125]
     # Create a DataFrame
     df = DataFrame(
         NAME = namess,
+        CASNO = CASNO,
+        formula = formula,
         MW = mws,
         PRECURSOR_M_Z = precursor_mzs,
         COLLISION_ENERGY = collision_energies,
@@ -109,19 +112,15 @@ function sdf_to_data(sdf_file, compound_name, collision_energy)
         
         output_string = replace(Mass_info, r"[\[\]\"]" => "")
 
-        # Replace ", " with "\n"
         output_string = replace(output_string, ", " => "\n")
         
         mass = Float64[]
         intensity = Float64[]
 
-        # Regular expression to match mass and intensity pairs
         regex = r"(\d+\.\d+)\s(\d+(?:\.\d+)?)"
 
-        # Extract mass and intensity pairs using regular expression
         matches = eachmatch(regex, Mass_info)
 
-        # Iterate over matches and extract mass and intensity
         for match in matches
             push!(mass, parse(Float64, match.captures[1]))
             push!(intensity, parse(Float64, match.captures[2]))
@@ -159,3 +158,8 @@ results, mass, intensity, output_string = sdf_to_data(sdf_file, compound_name, c
 #This will show the raw data of the spectrum in the REPL in the MASBANK format
 print(output_string)
     
+results.MASS[1]
+
+text_f = parse_text_file(sdf_file)
+
+text_f["<NOTES"]

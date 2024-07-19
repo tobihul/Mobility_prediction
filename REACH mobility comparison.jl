@@ -1,5 +1,5 @@
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots, MultivariateStats, Images
-using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLBase
+using GLM, TypedTables, LinearAlgebra, ScikitLearn, Random, MLBase, MLDataUtils, MLJ
 using ScikitLearn: @sk_import
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
@@ -127,7 +127,7 @@ function remove_high_std(RPLC_data, std_threshold)
 
 end
 function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
-    fingerprints = [PubChem_fps MACCS]
+    fingerprints = PubChem_fps
 
     #fingerprints = fingerprints .- mean(fingerprints,dims = 1)
 
@@ -216,6 +216,14 @@ function remove_outliers_IQR(RPLC_data)
     filtered_RPLC_data = RPLC_data[non_outliers,:]
 
     return filtered_RPLC_data
+end
+function calculate_leverage(X,x)
+    leverage = zeros(length(x[:,1]))
+    b = pinv(X'*X)
+    for i = 1:length(x[:,1])
+        leverage[i] = pinv(x[i,:]) * b * x[i,:] 
+    end
+    return leverage
 end
 for i = 1:374
     #Locating the file
@@ -319,30 +327,30 @@ ScikitLearn.fit!(rf_cl, X_train, y_train)
 
 # List of InChI keys for the chemicals of interest
 InChI_REACH = CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\S36_UBAPMT_April2022.csv", DataFrame).Single_Constituent_InChI
-FPs_REACH = Int.(Matrix(CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\REACH fingerprints.csv", DataFrame)))
+FPs_REACH = Int.(Matrix(CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\REACH fingerprints.csv", DataFrame)))[:,167:end]
 classes =  CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\S36_UBAPMT_April2022.csv", DataFrame).M_Rationale # Replace with your actual InChI keys
 
 # Define a regular expression pattern to match "vM", "M", or "Pot. M/vM"
 pattern = r"(v?M(?:\/vM)?).*"
 
 # Initialize an empty vector to store the extracted parts
-extracted_parts = String[]
+REACH_test = String[]
 
 # Iterate over each string and extract the desired part
 for str in classes
     if startswith(str, "v")
-        push!(extracted_parts, "Very mobile")
+        push!(REACH_test, "Very mobile")
     elseif startswith(str, "M")
-        push!(extracted_parts, "Mobile")
+        push!(REACH_test, "Mobile")
     elseif startswith(str, "Pot. M/vM")
-        push!(extracted_parts, "Mobile")
+        push!(REACH_test, "Mobile")
     elseif startswith(str, "Not")
-        push!(extracted_parts, "Non-mobile")
+        push!(REACH_test, "Non-mobile")
     end
 end
 
 
-extracted_parts
+REACH_test
 
 
 # Save the final results to a CSV file
@@ -353,7 +361,9 @@ y_hat_test = ScikitLearn.predict(rf_cl,X_test)
 
 score_train = ScikitLearn.score(rf_cl, X_train, y_train)
 score_test = ScikitLearn.score(rf_cl, X_test, y_test)
+
 y_hat_REACH = ScikitLearn.predict(rf_cl,FPs_REACH)
+score_reach = ScikitLearn.score(rf_cl,FPs_REACH, REACH_test)
 importance = rf_cl.feature_importances_
 
 sorted_importance = sortperm(importance, rev = true)
@@ -367,7 +377,7 @@ title = "RPLC important variables Classification",
 bottom_margin = 8Plots.mm,
 legend = false)
 
-c_matrix = confusion_matrix(y_hat_REACH, extracted_parts)
+c_matrix = confusion_matrix(y_hat_REACH, REACH_test)
 
 results = TPR_FDR(c_matrix)
 
@@ -382,7 +392,7 @@ label = "F1 score", shape = :utriangle, dpi = 300, markersize = 4)
 
 indices = []
 for i in eachindex(extracted_parts)
-    if extracted_parts[i] == "Very mobile" && y_hat_REACH[i] == "Non-mobile"
+    if REACH_test[i] == "Very mobile" && y_hat_REACH[i] == "Non-mobile"
         push!(indices, i)
     end
 end
@@ -391,7 +401,9 @@ indices
 
 
 
-searchd = findall(x-> x == InChI_REACH[indices][28], filtered_RPLC_data[:,1])
+searchd = findall(x-> x == InChI_REACH[indices][3], filtered_RPLC_data[:,1])
+
+
 
 
 scatter(filtered_RPLC_data[searchd,end]./100, ylims = (0,1), label = "Φ")
