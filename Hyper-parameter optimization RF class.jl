@@ -178,7 +178,16 @@ function remove_high_std(RPLC_data, std_threshold)
 
 end
 function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
-    fingerprints = [MACCS PubChem_fps]
+    #removed_fp = 668
+    #fingerprints = PubChem_fps[:, [1:removed_fp-1; removed_fp+1:end]]
+    
+
+    # Generate a random permutation of column indices
+    #perm = randperm(size(PubChem_fps, 2))
+
+    # Shuffle the columns of the matrix using the permutation
+    #fingerprints = PubChem_fps[:, perm]
+    fingerprints = PubChem_fps
 
     #fingerprints = fingerprints .- mean(fingerprints,dims = 1)
 
@@ -190,31 +199,11 @@ function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
 
     p_b = filtered_RPLC_data[:,end]./100
 
-    y = String[]
-    for i in eachindex(p_b)
-        if p_b[i] >= 0.6
-            push!(y, "Non-mobile")
-        elseif p_b[i] <= 0.2
-            push!(y, "Very mobile")
-        else 
-            push!(y, "Mobile")
-        end
-    end
+    y = assign_labels(p_b)
 
-    index_first_occurrence = Vector{Int}(undef, length(unique_compounds))
-
-    for i in eachindex(unique_compounds)
-
-        if (i % 100) == 0
-            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
-        end
-        index_first_occurrence[i] = findfirst(x-> x == unique_compounds[i], filtered_RPLC_data[:,1])
-
-    end
-
-    strat_labels = y[index_first_occurrence]
+    first_labels = strat_labels(unique_compounds,filtered_RPLC_data[:,1], y)
     
-    train, test = train_test_split(unique_compounds, test_size = 0.1, random_state = 42, stratify = strat_labels)
+    train, test = train_test_split(unique_compounds, test_size = split, random_state = 42, stratify = first_labels, shuffle = true)
     
     # Initialize variables
     train_indices = []
@@ -232,7 +221,7 @@ function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
             append!(test_indices, occurrences)
         end
     end
-
+    Random.seed!(42)
      # Shuffle the indices
      shuffle!(train_indices)
      shuffle!(test_indices)
@@ -243,6 +232,35 @@ function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
     y_test = y[test_indices]
 
     return X_train, X_test, y_train, y_test, train_indices, test_indices, y
+end
+function assign_labels(Φ)
+    y = String[]
+    for i in eachindex(Φ)
+        if Φ[i] >= 0.6
+            push!(y, "Non-mobile")
+        elseif Φ[i] <= 0.2
+            push!(y, "Very mobile")
+        else 
+            push!(y, "Mobile")
+        end
+    end
+    return y
+end
+function strat_labels(unique_vector, original_data, labels)
+
+    index_first_occurrence = Vector{Int}(undef, length(unique_vector))
+
+    for i in eachindex(unique_vector)
+
+        if (i % 100) == 0
+            println("$(round(i/length(unique_vector)*100, digits = 2))%")
+        end
+        index_first_occurrence[i] = findfirst(x-> x == unique_vector[i], original_data[:,1])
+
+    end
+
+    strat_labels = labels[index_first_occurrence]
+    return strat_labels
 end
 function remove_outliers_IQR(RPLC_data)
     unique_compounds = unique(RPLC_data[:,1])
@@ -351,32 +369,193 @@ RPLC_data = Final_table_unique[indices_RPLC,:]
 @time filtered_RPLC_data = remove_outliers_IQR(RPLC_data)
 filtered_RPLC_data
 MACCS, PubChem_fps = format_fingerprints(filtered_RPLC_data)
-MACCS
 PubChem_fps
 
-indices_HILIC = indices_RPLC = findall(row -> occursin("HILIC", row.LC_mode), eachrow(Final_table_unique))
-RPLC_RT = Final_table_unique[indices_RPLC,end-1]
-HILIC_RT =  Final_table_unique[indices_HILIC,end-1]
-rp_Inchikey = Final_table_unique[Final_table_unique.LC_mode .== "RP", :].Inchikey
-    hilic_Inchikey = Final_table_unique[Final_table_unique.LC_mode .== "HILIC", :].Inchikey
-
-    # Find the intersection of CIDss for both modes
-    common_Inchikey = intersect(rp_Inchikey, hilic_Inchikey)
-
-    #Removing the ones that have been separated by both as we already have them
-    condition = in.(Final_table_unique.Inchikey, Ref(common_Inchikey))
-    Final_table_unique = Final_table_unique[condition, :]
-   
 #############################################################################################################
 #Train/test split without data leakage
 
 X_train, X_test, y_train, y_test, train_indices, test_indices, y = train_test_split_no_leakage_classifier(filtered_RPLC_data, 0.1)
 
+#################
+#Cross-validation
+X_train
+X_test
 
-#############################################################################################################
-#Making the model
+unique_train = unique(filtered_RPLC_data[train_indices,1])
 
-rf_cl = RandomForestClassifier(n_estimators = 100, max_features = 1, random_state = 42, class_weight = "balanced")
+Φ = filtered_RPLC_data[train_indices,end]./100
+y = assign_labels(Φ)
+first_labels = strat_labels(unique_train,filtered_RPLC_data[train_indices,1],y)
+
+skf = StratifiedKFold(n_splits=3, shuffle=true, random_state=42)
+
+train_fold = []
+test_fold = []
+
+for (i, (train_index, test_index)) in enumerate(skf.split(unique_indices, first_labels))
+
+    train_index_julia = Int64.(collect(train_index)).+1
+    test_index_julia = Int64.(collect(test_index)).+1
+    
+    push!(train_fold, train_index_julia)
+    push!(test_fold, test_index_julia)
+end
+
+function append_occurrences_folds(unique_train::Vector{String}, fold::Int)
+    # Initialize variables
+    train_indices_fold = Int[]
+    test_indices_fold = Int[]
+
+    # Find indices for train and test data
+    @time for i in eachindex(unique_train)
+        if (i % 10) == 0
+            println("$(round(i/length(unique_train)*100, digits = 2))%")
+        end
+        occurrences = findall(x -> x == unique_train[i], filtered_RPLC_data[train_indices, 1])
+        if unique_train[i] in unique_train[train_fold[fold]]
+            append!(train_indices_fold, occurrences)
+        else
+            append!(test_indices_fold, occurrences)
+        end
+    end
+
+    shuffle!(train_indices_fold)
+    shuffle!(test_indices_fold)
+    return train_indices_fold, test_indices_fold
+
+end
+
+train_fold_1,test_fold_1 = append_occurrences_folds(unique_train, 1) 
+
+train_fold_2,test_fold_2 = append_occurrences_folds(unique_train, 2) 
+
+train_fold_3,test_fold_3 = append_occurrences_folds(unique_train, 3) 
+
+unique_train[train_fold_1]
+
+sum(y_train[train_fold_1].=="Very mobile")
+sum(y_train[train_fold_1].=="Non-mobile")
+sum(y_train[train_fold_1].=="Mobile")
+
+sum(y_train[train_fold_2].=="Very mobile")
+sum(y_train[train_fold_2].=="Non-mobile")
+sum(y_train[train_fold_2].=="Mobile")
+
+sum(y_train[train_fold_3].=="Very mobile")
+sum(y_train[train_fold_2].=="Non-mobile")
+sum(y_train[train_fold_2].=="Mobile")
+using MLJ
+#Making the model CV
+fingeprints = [MACCS PubChem_fps][train_indices,:]
+function CV_3_RFC(n_estimatorss, max_featuress, max_depths, min_samples_splits, min_samples_leafs)
+
+    rf_cl = RandomForestClassifier(n_estimators = n_estimatorss, max_features = max_featuress,
+                                   max_depth = max_depths, min_samples_split = min_samples_splits,
+                                   min_samples_leaf = min_samples_leafs,
+                                   random_state = 42, class_weight = "balanced", n_jobs = -1)
+
+    #Fold 1
+    println("Fold1")
+    ScikitLearn.fit!(rf_cl, X_train[train_fold_1,:], y_train[train_fold_1], )
+    
+    score_train_fold_1 = ScikitLearn.score(rf_cl, X_train[train_fold_1,:], y_train[train_fold_1])
+    score_test_fold_1 = ScikitLearn.score(rf_cl, X_train[test_fold_1,:], y_train[test_fold_1])
+
+    y_hat_train = ScikitLearn.predict(rf_cl,X_train[train_fold_1,:])
+    y_hat_test = ScikitLearn.predict(rf_cl,X_train[test_fold_1,:])
+
+    c_matrix_train_f1 = confusion_matrix(y_hat_train, y_train[train_fold_1])
+    results_train_f1 = TPR_FDR(c_matrix_train_f1)
+    F1_train_f1 = mean(results_train_f1[:,4])
+
+    c_matrix_test_f1 = confusion_matrix(y_hat_test, y_train[test_fold_1])
+    results_test_f1 = TPR_FDR(c_matrix_test_f1)
+    F1_test_f1 = mean(results_test_f1[:,4])
+    #Fold 2
+    println("Fold2")
+    ScikitLearn.fit!(rf_cl, X_train[train_fold_2,:], y_train[train_fold_2])
+    
+    score_train_fold_2 = ScikitLearn.score(rf_cl, X_train[train_fold_2,:], y_train[train_fold_2])
+    score_test_fold_2 = ScikitLearn.score(rf_cl, X_train[test_fold_2,:], y_train[test_fold_2])
+    
+    y_hat_train = ScikitLearn.predict(rf_cl,X_train[train_fold_2,:])
+    y_hat_test = ScikitLearn.predict(rf_cl,X_train[test_fold_2,:])
+
+    c_matrix_train_f2 = confusion_matrix(y_hat_train, y_train[train_fold_2])
+    results_train_f2 = TPR_FDR(c_matrix_train_f2)
+    F1_train_f2 = mean(results_train_f2[:,4])
+
+    c_matrix_test_f2 = confusion_matrix(y_hat_test, y_train[test_fold_2])
+    results_test_f2 = TPR_FDR(c_matrix_test_f2)
+    F1_test_f2 = mean(results_test_f2[:,4])
+    #Fold 3
+    println("Fold3")
+    ScikitLearn.fit!(rf_cl, X_train[train_fold_3,:], y_train[train_fold_3])
+    
+    score_train_fold_3 = ScikitLearn.score(rf_cl, X_train[train_fold_3,:], y_train[train_fold_3])
+    score_test_fold_3 = ScikitLearn.score(rf_cl, X_train[test_fold_3,:], y_train[test_fold_3])
+
+    y_hat_train = ScikitLearn.predict(rf_cl,X_train[train_fold_3,:])
+    y_hat_test = ScikitLearn.predict(rf_cl,X_train[test_fold_3,:])
+
+    c_matrix_train_f3 = confusion_matrix(y_hat_train, y_train[train_fold_3])
+    results_train_f3 = TPR_FDR(c_matrix_train_f3)
+    F1_train_f3 = mean(results_train_f3[:,4])
+
+    c_matrix_test_f3 = confusion_matrix(y_hat_test, y_train[test_fold_3])
+    results_test_f3 = TPR_FDR(c_matrix_test_f3)
+    F1_test_f3 = mean(results_test_f3[:,4])
+
+    mean_train_score = mean([score_train_fold_1,score_train_fold_2,score_train_fold_3])
+    mean_test_score = mean([score_test_fold_1,score_test_fold_2,score_test_fold_3])
+    mean_train_F1 = mean([F1_train_f1, F1_train_f2, F1_train_f3])
+    mean_test_F1 = mean([F1_test_f1, F1_test_f2, F1_test_f3])
+    return mean_train_score, mean_test_score, mean_train_F1, mean_test_F1
+end
+
+df_results = DataFrame(n_estimators = Int[], max_features = Float64[], max_depth = Int[],
+                       min_samples_split = Int[], min_samples_leaf = Int[], 
+                       CV_3_train_score = Float64[],
+                       CV_3_test_score = Float64[], CV_3_train_F1 = Float64[], CV_3_test_F1 = Float64[])
+
+
+n_estimatorss = [10,20,50,100,200]
+max_featuress = [1.0, 0.5, 0.2, 0.1]
+max_depths = [10, 25, 100]
+min_samples_splits = [2,4,6]
+min_samples_leafs = [1,2,4]
+
+for n_estimators in n_estimatorss
+    for max_features in max_featuress
+        for max_depth in max_depths
+            for min_samples_split in min_samples_splits
+                for min_samples_leaf in min_samples_leafs
+
+                    @show n_estimators, max_features, max_depth, min_samples_split, min_samples_leaf 
+
+                    train_score, test_score, F1_train, F1_test = CV_3_RFC(n_estimators, max_features, max_depth, min_samples_split, min_samples_leaf)
+
+                    @show train_score, test_score
+
+                    push!(df_results, [n_estimators, max_features, max_depth, min_samples_split, min_samples_leaf, train_score, test_score, F1_train, F1_test])
+
+                end
+            end
+        end
+    end
+end
+
+vscodedisplay(df_results)
+
+CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\All CV scores mobility data full dataset.csv", df_results)
+
+##############
+#Model with best settings
+using MLJ
+rf_cl = RandomForestClassifier(n_estimators = 100, max_features = 0.5,
+                                   max_depth = 100, min_samples_split = 2,
+                                   min_samples_leaf = 2,
+                                   random_state = 42, class_weight = "balanced", n_jobs = -1)
 
 
 ScikitLearn.fit!(rf_cl, X_train, y_train)
@@ -387,17 +566,9 @@ y_hat_test = ScikitLearn.predict(rf_cl,X_test)
 score_train = ScikitLearn.score(rf_cl, X_train, y_train)
 score_test = ScikitLearn.score(rf_cl, X_test, y_test)
 
-
-###########
-#Getting the confusion matrix
 c_matrix = confusion_matrix(y_hat_train, y_train)
 
 results = TPR_FDR(c_matrix)
-
-#bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
-#title = "Train without outliers n = $(length(y_train))", titlefont = font(10))
-
-#p_train = bar!(results[:,1], results[:,3], label = "FDR")
 
 scatter([1,2,3], results[:,2], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
 label = "TPR", shape = :diamond, xlims = (0.5,3.5), grid = :y, markersize = 4,
@@ -414,10 +585,6 @@ c_matrix = confusion_matrix(y_hat_test, y_test)
 
 results = TPR_FDR(c_matrix)
 
-#bar(results[:,1], results[:,2], ylims = (0,1), label = "TPR", dpi = 300,
-#title = "Test without outliers n = $(length(y_test))",titlefont = font(10))
-#p_test = bar!(results[:,1], results[:,3], label = "FDR")
-
 scatter([1,2,3], results[:,2], xticks = ([1,2,3],results[:,1]), ylims = (0,1),
 label = "TPR", shape = :diamond, xlims = (0.5,3.5), grid = :y, markersize = 4,
 title = "Test data n = $(length(y_test))", titlefont = font(10))
@@ -431,36 +598,46 @@ label = "F1 score", shape = :utriangle, dpi = 300, markersize = 4)
 
 plot(p_train, p_test, size = (800,400), dpi = 300)
 
-cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
-savefig("Distribution Retention factor entire dataset.png")
-cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
-
-########
 #Checking feature importances
 importance = rf_cl.feature_importances_
-
+sum(importance)
 sorted_importance = sortperm(importance, rev = true)
+sorted_importance_original
+labels_original = PubChem_keys[sorted_importance_original]
+labels = PubChem_keys[sorted_importance]
 
-labels = All_keys_log_MW[sorted_importance]
-
-bar(labels[1:end],sort(importance, rev = true)[1:end],
-xrotation=30, 
+bar(labels[1:10],sort(importance, rev = true)[1:10],
+xrotation=25, 
 dpi = 300,
 title = "RPLC important variables Classification", 
-bottom_margin = 8Plots.mm,
+left_margin = 10Plots.mm,
+bottom_margin = 10Plots.mm,
 legend = false)
-#179 141 128
-findfirst(x-> x == labels, All_keys)
-ind = findall(x-> x =="Very mobile", y_train)
-scatter(X_test[indices,179].+(rand(length(indices))./1.1), X_test[indices,128].+(rand(length(indices))./1.1), group = y_test[indices],
-xlabel = "> 12C", ylabel = "C-C-C-C-C-C-C-C", dpi = 300, markersize = 2.5,
-title = " Wrongly classified as mobile")
-##############################
+
+#Applicability domain
+
+lev = calculate_leverage(X_train, X_test)
+
+histogram(lev, dpi = 300,
+xlabel = "hᵢ", label = "test", xlims = (0,0.2))
+
+warning_h = (3 * length(X_train[1,:])+1)/length(X_train[:,1])
+
+vline!([warning_h], label = "warning (h*)")
+
+melamine = findall(x-> x =="InChI=1S/C3H6N6/c4-1-7-2(5)9-3(6)8-1/h(H6,4,5,6,7,8,9)",filtered_RPLC_data[:,1])
+
+scatter(filtered_RPLC_data[melamine, end], ylims = (0,100))
+
+sum(X_train[:,527])/length(X_train[:,1])*100
+
+
+
 #Tracking misclassifications
 
 indices = []
 for i in eachindex(y_test)
-    if y_test[i] == "Non-mobile" && y_hat_test[i] == "Mobile"
+    if y_test[i] == "Non-mobile" && y_hat_test[i] == "Non-mobile"
         push!(indices, i)
     end
 end
@@ -469,24 +646,48 @@ indices
 cmp_indices = test_indices[indices]
 
 
-Inchi = filtered_RPLC_data[cmp_indices,1]
-RTs = filtered_RPLC_data[cmp_indices,end-1]
+Inchi = filtered_RPLC_data[cmp_indices,1][7]
+
 p_bs = filtered_RPLC_data[cmp_indices,end]
-filtered_RPLC_data[cmp_indices,6][131]
-filtered_RPLC_data[cmp_indices,end-1][131]
-filtered_RPLC_data[cmp_indices,end][131]
-histogram(p_bs, bins = 10)
+
+histogram(filtered_RPLC_data[cmp_indices,6])
+
+filtered_RPLC_data[cmp_indices,5]
+
+histogram(p_bs./100, bins = 10, dpi = 300, xlims = (0,1),
+ylabel = "Frequency",
+xlabel = "Φ",
+label = "Non-mobile  misclassified as mobile",
+legend = :topright, legendfont = font(12), xtickfont=font(12), 
+ytickfont=font(12), 
+guidefont=font(18),
+ylims = (0,300))
+
+vline!([0.6], linestyle = :dash, label = "Non-mobile label threshold",
+c = :red)
 
 cmps = findall(x-> x == Inchi, filtered_RPLC_data[:,1])
+means = mean(filtered_RPLC_data[cmps,end]./100)
+stds = std(filtered_RPLC_data[cmps,end]./100)
+
+cmps = findall(x-> x == Inchi, filtered_RPLC_data[:,1])
+means = mean(filtered_RPLC_data[cmps,end]./100)
+stds = std(filtered_RPLC_data[cmps,end]./100)
+
+histogram(filtered_RPLC_data[cmp_indices,end]./100, bins = 10)
+
 
 scatter(filtered_RPLC_data[cmps,end]./100, ylims = (0,1),
-dpi = 300, title = "PROCAINAMIDE")
+dpi = 300, title = "All entries Bis(2-ethylhexyl) phthalate", 
+xlabel = "Entry nr.", ylabel = "Φ", legend = false)
 
 
-scatter(RTs, Inchi,  dpi = 300,
+
+
+scatter(p_bs./100,  dpi = 300,
 title = "Very mobile misclassified as mobile",
 ylabel = "ϕ",
-xlabel = "Retention factor",
+xlabel = "Compound nr",
 legend = false)
 
 scatter!(RTs, dpi = 300,
@@ -496,80 +697,9 @@ xlabel = "N compound",
 label = "Retention factor")
 
 
+MW = filtered_RPLC_data[:,5]
+XlogP = filtered_RPLC_data[:,6]
+Φ = filtered_RPLC_data[:,end]./100
 
-sum(y_train.=="Very mobile")/length(y_train)
-sum(y_train.=="Non-mobile")/length(y_train)
-sum(y_train.=="Mobile")/length(y_train)
-
-sum(y_test.=="Very mobile")/length(y_test)
-sum(y_test.=="Non-mobile")/length(y_test)
-sum(y_test.=="Mobile")/length(y_test)
-
-
-n_estimators_t = [20, 50]
-
-criterion = "gini"
-
-max_depth_t = [50, 1000]
-
-min_samples_split_t = [2,4,6]
-
-min_samples_leaf_t = [1,4,6]
-
-random_state = 42
-
-f_name = "Random forest classifier final"
-
-df_results_3 = DataFrame(n_estimators = Int[], min_samples_split = Int[], min_samples_leaf = Int[], train_score = Float64[], test_score = Float64[])
-
-df_results_3 = CSV.read("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", DataFrame)
-
-get_params(rf_cl)
-
-#StratifiedKFold
-bins = 10
-k = 3
-classes = custom_binning(y[model], bins)
-
-histogram(classes, xticks = (1:bins),
-dpi = 300,
-label = false,
-title = "Binning of retention factors for Stratification")
-
-train, test = Stratifiedcv(X[model,:], classes, k)
-
-for n_estimators in n_estimators_t
-    @show n_estimators
-        for min_samples_split in min_samples_split_t
-            @show min_samples_split
-            for min_samples_leaf in min_samples_leaf_t
-                @show min_samples_leaf
-                scores_train = zeros(k)
-                scores_test = zeros(k)
-                for fold = collect(1:k)
-                    #train_fold = kf.train_indices[fold]
-                    #val_fold = kf.val_indices[fold]
-
-                    train_fold = train[fold]
-                    val_fold = test[fold]
-
-                    rf_regressor = RandomForestRegressor(n_estimators = n_estimators, criterion = criterion, 
-                                                        min_samples_split = min_samples_split, min_samples_leaf = min_samples_leaf, random_state = random_state, n_jobs = -1)
-
-                    ScikitLearn.fit!(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
-
-                    scores_train[fold] = ScikitLearn.score(rf_regressor, X[model, :][train_fold,:], y[model][train_fold])
-                    scores_test[fold] = ScikitLearn.score(rf_regressor, X[model, :][val_fold,:], y[model][val_fold])
-                end
-                score_train_cv = mean(scores_train)
-                score_test_cv = mean(scores_test)
-                @show score_train_cv
-                @show score_test_cv
-                push!(df_results_3, [n_estimators, min_samples_split, min_samples_leaf, score_train_cv, score_test_cv])
-            end
-    end
-end
-
-CSV.write("C:\\Users\\uqthulle\\Documents\\$f_name.csv ", df_results_3)
-
-
+scatter(MW, XlogP, alpha = 0.4, zcolor = Φ,
+label = false, dpi = 300, color_label = "Φ")
