@@ -162,4 +162,3 @@ results.MASS[1]
 
 text_f = parse_text_file(sdf_file)
 
-text_f["<NOTES"]

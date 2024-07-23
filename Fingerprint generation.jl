@@ -6,12 +6,14 @@ Fingerprinter = pyimport("rdkit.Chem.EState.Fingerprinter")
 
 
 smiles_of_interest = CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\PubChem_REACH_list.csv", DataFrame).canonicalsmiles
-
-
-@time pubchem_fp = DataFrame.(pd.from_smiles(smiles_of_interest[1:10], fingerprints=true, descriptors=false, threads = 20))
+smiles_of_interest
+df_smiles = DataFrame(smiles = smiles_of_interest)
+@time pubchem_fp = DataFrame.(pd.from_smiles(smiles_of_interest, fingerprints=true, descriptors=false, timeout = 600, maxruntime = 600))
 pubchem_fp = reduce(vcat, pubchem_fp)
+missing_Res = hcat(smiles_of_interest, pubchem_fp)
 
-    
+missing_temp = parse.(Int,missing_Res[:,2:end])
+missing_fps = hcat(missing_Res[:,1], missing_temp)
 
 PubChem_df
 CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\PubChem_fps_part_1.csv", PubChem_df)

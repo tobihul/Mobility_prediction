@@ -84,31 +84,16 @@ function TPR_FDR(c_matrix)
 
     return df
 end
-function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
-    #removed_fp = 668
-    #fingerprints = PubChem_fps[:, [1:removed_fp-1; removed_fp+1:end]]
-    
+function train_test_split_no_leakage_classifier(filtered_RPLC_data, split, fingerprints)
+   
 
-    # Generate a random permutation of column indices
-    #perm = randperm(size(PubChem_fps, 2))
+    unique_compounds = unique(filtered_RPLC_data.InChi)
 
-    # Shuffle the columns of the matrix using the permutation
-    #fingerprints = PubChem_fps[:, perm]
-    fingerprints = PubChem_fps
-
-    #fingerprints = fingerprints .- mean(fingerprints,dims = 1)
-
-    #fingerprints = fingerprints ./ std(fingerprints,dims=1)
-
-    #fingerprints = replace(fingerprints, NaN => 0.0)
-
-    unique_compounds = unique(filtered_RPLC_data.InChI)
-
-    p_b = filtered_RPLC_data[:,end]./100
+    p_b = filtered_RPLC_data.Modifier./100
 
     y = assign_labels(p_b)
 
-    first_labels = strat_labels(unique_compounds,filtered_RPLC_data[:,1], y)
+    first_labels = strat_labels(unique_compounds,filtered_RPLC_data.InChi, y)
     
     train, test = train_test_split(unique_compounds, test_size = split, random_state = 42, stratify = first_labels, shuffle = true)
     
@@ -121,7 +106,7 @@ function train_test_split_no_leakage_classifier(filtered_RPLC_data, split)
         if (i % 100) == 0
             println("$(round(i/length(unique_compounds)*100, digits = 2))%")
         end
-        occurrences = findall(x -> x == unique_compounds[i], filtered_RPLC_data[:, 1])
+        occurrences = findall(x -> x == unique_compounds[i], filtered_RPLC_data.InChi)
         if unique_compounds[i] in train
             append!(train_indices, occurrences)
         else
@@ -162,7 +147,7 @@ function strat_labels(unique_vector, original_data, labels)
         if (i % 100) == 0
             println("$(round(i/length(unique_vector)*100, digits = 2))%")
         end
-        index_first_occurrence[i] = findfirst(x-> x == unique_vector[i], original_data[:,1])
+        index_first_occurrence[i] = findfirst(x-> x == unique_vector[i],original_data)
 
     end
 
@@ -216,6 +201,31 @@ function remove_missing_identifiers(RPLC_data)
     
     return RPLC_data
 end
+function append_occurrences_folds(unique_train::Vector{String}, fold::Int)
+    train_set = Set(unique_train[train_fold[fold]])
+    # Initialize variables
+    train_indices_fold = Int[]
+    test_indices_fold = Int[]
+
+    # Find indices for train and test data
+    @time for i in eachindex(unique_train)
+        if (i % 10) == 0
+            println("$(round(i/length(unique_train)*100, digits = 2))%")
+        end
+        occurrences = findall(x -> x == unique_train[i], filtered_RPLC_data.InChi[train_indices])
+        if unique_train[i] in train_set
+            append!(test_indices_fold, occurrences)
+        else
+            append!(train_indices_fold, occurrences)
+        end
+    end
+
+    shuffle!(train_indices_fold)
+    shuffle!(test_indices_fold)
+    return train_indices_fold, test_indices_fold
+
+end
 
 export interpolate_B_modifier, calculate_leverage, remove_missing_and_outliers, TPR_FDR, 
-train_test_split_no_leakage_classifier, assign_labels, strat_labels, remove_outliers_IQR, remove_missing_identifiers
+train_test_split_no_leakage_classifier, assign_labels, strat_labels, remove_outliers_IQR, remove_missing_identifiers,
+append_occurrences_folds

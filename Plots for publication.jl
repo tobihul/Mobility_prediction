@@ -1,5 +1,4 @@
 ###Plot to show nonadecanoic acid
-
 nd_entries = findall(x-> x == "InChI=1S/C19H38O2/c1-2-3-4-5-6-7-8-9-10-11-12-13-14-15-16-17-18-19(20)21/h2-18H2,1H3,(H,20,21)",RPLC_data[:,2])
 minimum((RPLC_data[nd_entries,end]./100)[2:end])
 scatter((RPLC_data[nd_entries,end]./100), dpi = 300, 
@@ -17,37 +16,68 @@ plot!([-0.5, 0.1], [0.7, 0.7], c = :red, ls = :dash, label = false)
 plot!([-0.5, 0.1], [1, 1], c = :red, ls = :dash, label = false) 
 hline!([1], c = :red, ls = :dash, label = false)
 
-histogram(filtered_RPLC_data.Retention_factors, xlims = (0,1), dpi = 300,
-xlabel = "Retention factor", label = false)
-vspan!([0, 0.2], color=:red, alpha=0.3, label = "Very mobile")
-vspan!([0.2, 0.6], color=:yellow3, alpha=0.3, 
-label = "Mobile")
-p1 = vspan!([0.6, 1], color=:green, alpha=0.3,
-label = "Non-Mobile",
-bottom_margin = 5Plots.mm)
-
-
-histogram(filtered_RPLC_data.Modifier./100, 
-titlefont = 10,
-formatter = :plain,
-dpi = 300, label = false, xlims = (0,1), xlabel = "Φ",)
+#Show the classification according to mobility
+histogram(filtered_RPLC_data.Modifier./100,
+dpi = 300, label = false, xlims = (0,1), formatter = :plain,
+legendfont = font(13), xtickfont=font(13), 
+ytickfont=font(13), 
+guidefont=font(15), ylabel = "Frequency", 
+xlabel = "Fraction of organic modifier (Φ)")
 vspan!([0, 0.2], color=:red, alpha=0.3, label = "Very mobile")
 vspan!([0.2, 0.6], color=:darkorange, alpha=0.3, label = "Mobile")
-p2 = vspan!([0.6, 1], color=:green, alpha=0.3, label = "Non-mobile",
-bottom_margin = 2.5Plots.mm)
-
-plot(p1,p2, size = (800,400))
+vspan!([0.6, 1], color=:green, alpha=0.3, label = "Non-mobile")
 
 #####
 #Chemical space of unique chemicals included with Φ
 chem_space = scatter(filtered_RPLC_data.MW, filtered_RPLC_data.XlogP,
 zcolor = filtered_RPLC_data.Modifier./100, dpi = 300,
 xlabel = "MW (Da)", ylabel = "XlogP", label = false,
-colorbar_title  = "Φ", clims = (0,1), markerstrokewidth=0, alpha = 0.7,
+colorbar_title  = "Fraction of organic modifier (Φ)", clims = (0,1), 
+markerstrokewidth=0, alpha = 0.7,
 legendfont = font(13), xtickfont=font(13), 
 ytickfont=font(13), 
 guidefont=font(15), colorbar_titlefont = font(15),
 color = :viridis)
+
+hist_MW = histogram(filtered_RPLC_data.MW, 
+bins = 500, 
+linecolor=:transparent,
+ xlims = (0,1000),
+dpi = 300,
+xlabel = ("Molecular Weight (Da)"),
+label = false,
+legendfont = font(11), xtickfont=font(11), 
+ytickfont=font(11), 
+guidefont=font(11), ylabel = "Frequency")
+
+hist_XLOGP = histogram(filtered_RPLC_data.XlogP,
+bins = 100,  
+linecolor=:transparent,
+dpi = 300,
+xlabel = ("XlogP"),
+label = false, formatter = :plain,
+legendfont = font(11), xtickfont=font(11), 
+ytickfont=font(11), 
+guidefont=font(11), ylabel = "Frequency")
+
+hist_RF = histogram(filtered_RPLC_data.Retention_factors,  
+linecolor=:transparent,
+dpi = 300,
+xlabel = ("Retention factors"),
+label = false, formatter = :plain,
+legendfont = font(11), xtickfont=font(11), 
+ytickfont=font(11), 
+guidefont=font(11), ylabel = "Frequency")
+
+hist_MOD = histogram(filtered_RPLC_data.Modifier./100,
+xlims = (0,1),
+linecolor=:transparent,
+dpi = 300,
+xlabel = ("Φ"),
+label = false, formatter = :plain,
+legendfont = font(11), xtickfont=font(11), 
+ytickfont=font(11), 
+guidefont=font(11), ylabel = "Frequency")
 
 l = @layout [
     a{0.7w} [
