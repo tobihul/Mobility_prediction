@@ -39,7 +39,7 @@ SMILES = "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
 
 smiles_to_mobility(path, SMILES)
 ```
-Finally, to run a list of SMILES and save it as a csv you can either 
+Finally, to run a list of SMILES and save it as a csv:
 
 ```julia
 using Mobility_prediction
