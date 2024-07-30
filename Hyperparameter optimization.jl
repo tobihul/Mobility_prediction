@@ -75,9 +75,10 @@ X_train, X_test, y_train, y_test, train_indices, test_indices, y = train_test_sp
 
 #################
 #Cross-validation
-X_train
-X_test
-
+X_train = Matrix(X_train)
+X_test = Matrix(X_test)
+y_train
+y_test
 unique_train = string.(unique(filtered_RPLC_data.InChi[train_indices]))
 original_data = string.(filtered_RPLC_data.InChi[train_indices])
 Φ = filtered_RPLC_data.Modifier[train_indices]./100
@@ -131,7 +132,7 @@ function CV_3_RFC(n_estimatorss, max_featuress, max_depths, min_samples_splits, 
 
     #Fold 1
     println("Fold1")
-    ScikitLearn.fit!(rf_cl, X_train[train_fold_1,:], y_train[train_fold_1], )
+    ScikitLearn.fit!(rf_cl, X_train[train_fold_1,:], y_train[train_fold_1])
     
     score_train_fold_1 = ScikitLearn.score(rf_cl, X_train[train_fold_1,:], y_train[train_fold_1])
     score_test_fold_1 = ScikitLearn.score(rf_cl, X_train[test_fold_1,:], y_train[test_fold_1])
@@ -195,8 +196,8 @@ df_results = DataFrame(n_estimators = Int[], max_features = Float64[], max_depth
                        CV_3_test_score = Float64[], CV_3_train_F1 = Float64[], CV_3_test_F1 = Float64[])
 
 #Grid search parameters
-n_estimatorss = [10,20,50,100,200]
-max_featuress = [1.0, 0.5, 0.2, 0.1]
+n_estimatorss = [200]
+max_featuress = [0.5, 0.2, 0.1]
 max_depths = [10, 25, 50, 100]
 min_samples_splits = [2,4,6]
 min_samples_leafs = [1,2,4]
@@ -225,6 +226,6 @@ end
 #Viewing the results
 vscodedisplay(df_results)
 #saving the results
-CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\All CV scores mobility data full dataset.csv", df_results)
+CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\All RepoRT CV scores mobility data full dataset.csv", df_results)
 
 

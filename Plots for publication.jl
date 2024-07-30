@@ -7,8 +7,8 @@ xlabel = "Entry n", ylabel = "Retention factor / Φ", label = "Φ")
 scatter!(RPLC_data[nd_entries,end-1], label = "Retention factor")
 
 #Plot to show excluded data_compounds
-scatter(Float64.(RPLC_data[:,end]./100),
- Float64.(RPLC_data[:,end-1]), label = false,
+scatter(Float64.(Final_table.Modifier[indices_RPLC]./100),
+ Float64.(Final_table.Retention_factors[indices_RPLC]), label = false,
 dpi = 300, xlabel = "Φ", ylabel = "Retention factor", 
 xlims = (0,1), ylims = (0,1.6), legend = :topleft)
 plot!([0.1, 0.1], [0.7, 1], c = :red, ls = :dash, label = "excluded")
@@ -97,6 +97,8 @@ annotate!(p[2], 100, 3000, text("b)", :left, 18))
 annotate!(p[3], -10, 14000, text("c)", :left, 18))
 annotate!(p[4], 0.1, 14000, text("d)", :left, 18))
 
+
+######Applicability Domain
 cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
-savefig("All distributions plot.png")
+savefig("Important variables all RepoRT.png")
 cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
