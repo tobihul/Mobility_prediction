@@ -67,7 +67,7 @@ end
 Final_table_unique = remove_missing_and_outliers(Final_table)
 
 #Getting indices for RPLC entries
-indices_RPLC = findall(row -> occursin("RP", row.LC_mode), eachrow(Final_table_unique))
+indices_RPLC = findall(row -> occursin("RP", row.LC_mode), eachrow(Final_table))
 RPLC_data = Final_table_unique[indices_RPLC,:]
 
 #Removing entries with either a missing SMILES or a missing InChI
@@ -167,4 +167,25 @@ df = DataFrame(Fingerprints_RepoRT, sorted_colnames[2:end])
 # Save the DataFrame as a CSV file
 CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\RepoRT fingerprints final.csv", df)
 
+##We also need to sort the REACH fingerprints correctly so we can do the same again but for REACH
+REACH_data = CSV.read("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Finerprints\\REACH SMILES and FPS.csv", DataFrame)
+
+# Extract column names
+colnames = names(REACH_data)
+
+# Separate the SMILES column from the fingerprint columns
+properties_cols = colnames[1:3]
+fingerprint_cols = colnames[4:end]
+
+# Extract the numerical part of the fingerprint column names and sort them since the current order is: FP0, FP1, FP10, FP100, etc.
+sorted_fingerprint_cols = sort(fingerprint_cols, by = x -> parse(Int, match(r"\d+", x).match))
+
+# Combine the SMILES column with the sorted fingerprint columns
+sorted_colnames = vcat(properties_cols, sorted_fingerprint_cols)
+
+# Reorder the DataFrame
+REACH_ordered_df = select(REACH_data, sorted_colnames)
+
+##Save the ordered DataFrame
+CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\REACH fingerprints final.csv", REACH_ordered_df)
 
