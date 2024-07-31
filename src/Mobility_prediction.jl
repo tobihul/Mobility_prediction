@@ -23,7 +23,7 @@ function __init__()
 
     # Construct paths to files in the root directory
     rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT.joblib")
-    csv_path = joinpath(pkg_dir, "Precompiled_SMILES.csv")
+    csv_path = joinpath(pkg_dir, "Precompiled SMILES.csv")
 
     # Print paths for debugging
     println("Random Forest path: $rf_path")
