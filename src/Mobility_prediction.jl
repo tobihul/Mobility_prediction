@@ -9,7 +9,7 @@ using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
 # Declare module-level variables
 const skl = Ref{PyObject}()
 const jl = Ref{PyObject}()
-const pd = Ref{PyObject}()
+const pd = PyNULL()
 const rf_cl = Ref{Any}()
 const Precompiled_smiles = Ref{DataFrame}()
 
