@@ -14,13 +14,25 @@ const rf_cl = Ref{Any}()
 const Precompiled_smiles = Ref{DataFrame}()
 
 function __init__()
+   
+   # Get the directory of the package source file
+    src_dir = dirname(pathof(Mobility_prediction))
+    
+    # Go up one level to get the root directory of the package
+    pkg_dir = dirname(src_dir)
+
+    # Construct paths to files in the root directory
+    rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT.joblib")
+    csv_path = joinpath(pkg_dir, "Precompiled_SMILES.csv")
+
+    # Print paths for debugging
+    println("Random Forest path: $rf_path")
+    println("CSV path: $csv_path")
+
+    # Import necessary modules
     skl[] = pyimport("sklearn.ensemble")
     jl[] = pyimport("joblib")
     pd[] = pyimport("padelpy")
-
-    pkg_dir = Base.dirname(@__DIR__)
-    rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT.joblib")
-    csv_path = joinpath(pkg_dir,"Precompiled_SMILES.csv")
 
     # Load the model and data
     rf_cl[] = jl[].load(rf_path)
