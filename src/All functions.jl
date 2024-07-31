@@ -231,7 +231,7 @@ function append_occurrences_folds(unique_train::Vector{String}, fold::Int)
 
 end
 function smiles_to_mobility(SMILES::String)
-
+    #test
     precompiled_smiles_df = Precompiled_smiles[]
 
     if SMILES in precompiled_smiles_df.SMILES
