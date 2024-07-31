@@ -1,6 +1,7 @@
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
 using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
 using ScikitLearn: @sk_import
+joblib = pyimport("joblib")
 pd = pyimport("padelpy")
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
@@ -324,6 +325,9 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
     yes_precompiled = [string for (string, is_found) in zip(SMILES, precompiled) if is_found]
     not_precompiled = [string for (string, is_found) in zip(SMILES, precompiled) if !is_found]
 
+    println("$(length(yes_precompiled)) already pre-computed")
+    println("$(length(not_precompiled)) need to be manually calculated")
+    
     #If there was a match with precomputed smiles, get the mobility from there
     if !isempty(yes_precompiled)
         #Find the indices of the precomputed ones
@@ -388,7 +392,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                             pubchem_fp = DataFrame.(pd.from_smiles(not_precompiled[i:i+9], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
                             temp_df = reduce(vcat, pubchem_fp)
                             append!(fingerprints, temp_df)
-                            push!(Smiles_list, not_precompiled[i:i+9])
+                            append!(Smiles_list, not_precompiled[i:i+9])
                             
                     
                         catch 
@@ -411,7 +415,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                             pubchem_fp = DataFrame.(pd.from_smiles(not_precompiled[i:end], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
                             temp_df = reduce(vcat, pubchem_fp)
                             append!(fingerprints, temp_df)
-                            push!(Smiles_list, not_precompiled[i:end])
+                            append!(Smiles_list, not_precompiled[i:end])
                             
                     
                         catch 
@@ -429,7 +433,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                         end
                     end
 
-                    println("Progress: $(round(length(fingerprints.PubchemFP0)/length(SMILES)* 100, digits = 1))%")
+                    println("Progress: $(round(length(fingerprints.PubchemFP0)/length(not_precompiled)* 100, digits = 1))%")
             end
         end
 
