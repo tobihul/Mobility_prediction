@@ -246,7 +246,7 @@ function smiles_to_mobility(SMILES::String)
 
         pubchem_fp = try
 
-            DataFrame(pd.from_smiles(SMILES, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+            DataFrame(pd[].from_smiles(SMILES, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
 
         catch
 
@@ -289,7 +289,7 @@ function smiles_to_mobility(path::String,SMILES::String)
 
         pubchem_fp = try
 
-            DataFrame(pd.from_smiles(SMILES, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+            DataFrame(pd[].from_smiles(SMILES, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
 
         catch
 
@@ -359,7 +359,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
             Smiles_list = String[]
             try
 
-                pubchem_fp = DataFrame.(pd.from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+                pubchem_fp = DataFrame.(pd[].from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
                 fingerprints = reduce(vcat, pubchem_fp)
                 #If they all succeed the list of smiles simply becomes all of them
                 Smiles_list = not_precompiled
@@ -370,7 +370,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                 for j = collect(1:length(not_precompiled))
                     
                     try
-                        pubchem_fp = DataFrame(pd.from_smiles(not_precompiled[j], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+                        pubchem_fp = DataFrame(pd[].from_smiles(not_precompiled[j], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
                         append!(fingerprints, pubchem_fp)
                         #Keep the smiles that were succesfully calculated
                         push!(Smiles_list , not_precompiled[j])
@@ -406,7 +406,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                             for j = collect(i:i+9)
                                 
                                 try
-                                    pubchem_fp = DataFrame(pd.from_smiles(not_precompiled[j], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+                                    pubchem_fp = DataFrame(pd[].from_smiles(not_precompiled[j], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
                                     append!(fingerprints, pubchem_fp)
                                     push!(Smiles_list, not_precompiled[j])
                                 
@@ -419,7 +419,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                     else #When the loop reaches the last batch, to avoid having indexing errors if the batch has < 10 entries
                         try
 
-                            pubchem_fp = DataFrame.(pd.from_smiles(not_precompiled[i:end], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+                            pubchem_fp = DataFrame.(pd[].from_smiles(not_precompiled[i:end], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
                             temp_df = reduce(vcat, pubchem_fp)
                             append!(fingerprints, temp_df)
                             append!(Smiles_list, not_precompiled[i:end])
@@ -429,7 +429,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                             for j = collect(i:length(not_precompiled))
                             
                                 try
-                                    pubchem_fp = DataFrame(pd.from_smiles(not_precompiled[j], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+                                    pubchem_fp = DataFrame(pd[].from_smiles(not_precompiled[j], fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
                                     append!(fingerprints, pubchem_fp)
                                     push!(Smiles_list, not_precompiled[j])
                                 catch
