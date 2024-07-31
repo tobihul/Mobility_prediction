@@ -6,6 +6,8 @@
 
 In order to install the **LC_MS_Resolved_Peaks.jl** package in Julia, run the follwing: "]" to enter package manager and then "add https://github.com/tobihul/Mobility_prediction"
 
+Alternatively: 
+
 ```julia
 using Pkg
 Pkg.add(PackageSpec(url="https://github.com/tobihul/Mobility_prediction"))
@@ -37,7 +39,7 @@ SMILES = "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"
 
 smiles_to_mobility(path, SMILES)
 ```
-Finally, to run a list of SMILES and save it as a csv you can either 
+Finally, to run a list of SMILES and save it as a csv:
 
 ```julia
 using Mobility_prediction
