@@ -9,12 +9,12 @@ using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
 # Declare module-level variables
 const skl = Ref{PyObject}()
 const jl = Ref{PyObject}()
-const pd = PyNULL()
+const pd = Ref{PyObject}()
 const rf_cl = Ref{Any}()
 const Precompiled_smiles = Ref{DataFrame}()
 
 function __init__()
-    copy!(pd,pyimport("padelpy"))
+   
    # Get the directory of the package source file
     src_dir = dirname(pathof(Mobility_prediction))
     

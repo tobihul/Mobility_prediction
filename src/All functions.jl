@@ -9,6 +9,7 @@ using ScikitLearn: @sk_import
 # You can access `rf_cl` and `Precompiled_smiles` from the main module
 const rf_cl = Mobility_prediction.rf_cl
 const Precompiled_smiles = Mobility_prediction.Precompiled_smiles
+const pd = Mobility_prediction.pd
 function interpolate_B_modifier(time::Float64, gradient::DataFrame)
     times = gradient[:,1]./run_time
     idx = searchsortedlast(times, time)
