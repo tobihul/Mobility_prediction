@@ -266,9 +266,9 @@ function smiles_to_mobility(SMILES::String)
         fingerprints = parse.(Int, Matrix(ordered_pubchem_fp))
 
         #Predict the class
-        predicted_class = ScikitLearn.predict(rf_cl,fingerprints)
+        predicted_class = ScikitLearn.predict(rf_cl[],fingerprints)
 
-        predicted_probability = Int(round.(maximum(ScikitLearn.predict_proba(rf_cl,fingerprints))*100, digits = 0))
+        predicted_probability = Int(round.(maximum(ScikitLearn.predict_proba(rf_cl[],fingerprints))*100, digits = 0))
     end
 
     return predicted_class, predicted_probability
@@ -309,9 +309,9 @@ function smiles_to_mobility(path::String,SMILES::String)
         fingerprints = parse.(Int, Matrix(ordered_pubchem_fp))
 
         #Predict the class
-        predicted_class = ScikitLearn.predict(rf_cl,fingerprints)
+        predicted_class = ScikitLearn.predict(rf_cl[],fingerprints)
 
-        predicted_probability = Int(round.(maximum(ScikitLearn.predict_proba(rf_cl,fingerprints))*100, digits = 0))
+        predicted_probability = Int(round.(maximum(ScikitLearn.predict_proba(rf_cl[],fingerprints))*100, digits = 0))
     end
 
     df_results = DataFrame(SMILES = SMILES, Predicted_class = predicted_class, Probability = predicted_probability)
@@ -457,10 +457,10 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
         fingerprints = parse.(Int, Matrix(ordered_pubchem_fp))
 
         #Predict the class
-        predicted_class_not_comp = ScikitLearn.predict(rf_cl,fingerprints)
+        predicted_class_not_comp = ScikitLearn.predict(rf_cl[],fingerprints)
 
         #Get the probability
-        predicted_probability_not_comp = vec(Int.(round.(maximum(ScikitLearn.predict_proba(rf_cl,fingerprints), dims = 2)*100, digits = 0)))
+        predicted_probability_not_comp = vec(Int.(round.(maximum(ScikitLearn.predict_proba(rf_cl[],fingerprints), dims = 2)*100, digits = 0)))
 
         df_not_comp = DataFrame(SMILES = Smiles_list, Predicted_mobility = predicted_class_not_comp, Probability = predicted_probability_not_comp)
 
