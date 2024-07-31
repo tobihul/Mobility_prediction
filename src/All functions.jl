@@ -1,8 +1,7 @@
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
 using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
 using ScikitLearn: @sk_import
-joblib = pyimport("joblib")
-pd = pyimport("padelpy")
+
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
 @sk_import model_selection: train_test_split
