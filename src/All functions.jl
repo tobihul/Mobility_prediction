@@ -232,13 +232,15 @@ function append_occurrences_folds(unique_train::Vector{String}, fold::Int)
 end
 function smiles_to_mobility(SMILES::String)
 
-    if SMILES in Precompiled_smiles.SMILES
+    precompiled_smiles_df = Precompiled_smiles[]
 
-        index_smiles = findfirst(x-> x == SMILES, Precompiled_smiles.SMILES)
+    if SMILES in precompiled_smiles_df.SMILES
 
-        predicted_class = Precompiled_smiles[index_smiles,2]
+        index_smiles = findfirst(x-> x == SMILES, precompiled_smiles_df.SMILES)
 
-        predicted_probability = Precompiled_smiles[index_smiles,3]
+        predicted_class = precompiled_smiles_df[index_smiles,2]
+
+        predicted_probability = precompiled_smiles_df[index_smiles,3]
     else
 
         pubchem_fp = try
@@ -273,13 +275,15 @@ function smiles_to_mobility(SMILES::String)
 end
 function smiles_to_mobility(path::String,SMILES::String)
 
-    if SMILES in Precompiled_smiles.SMILES
+    precompiled_smiles_df = Precompiled_smiles[]
 
-            index_smiles = findfirst(x-> x == SMILES, Precompiled_smiles.SMILES)
+    if SMILES in precompiled_smiles_df.SMILES
 
-            predicted_class = Precompiled_smiles[index_smiles,2]
+            index_smiles = findfirst(x-> x == SMILES, precompiled_smiles_df.SMILES)
 
-            predicted_probability = Precompiled_smiles[index_smiles,3]
+            predicted_class = precompiled_smiles_df[index_smiles,2]
+
+            predicted_probability = precompiled_smiles_df[index_smiles,3]
     else
 
         pubchem_fp = try
@@ -318,8 +322,10 @@ function smiles_to_mobility(path::String,SMILES::String)
 end
 function smiles_to_mobility(path::String,SMILES::Vector{String})
 
+    precompiled_smiles_df = Precompiled_smiles[]
+
     #Checking if the fps are already precomputed
-    precompiled = [string in Precompiled_smiles.SMILES for string in SMILES]
+    precompiled = [string in precompiled_smiles_df.SMILES for string in SMILES]
 
     #Splitting into precomputed and not computed yet
     yes_precompiled = [string for (string, is_found) in zip(SMILES, precompiled) if is_found]
@@ -331,13 +337,13 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
     #If there was a match with precomputed smiles, get the mobility from there
     if !isempty(yes_precompiled)
         #Find the indices of the precomputed ones
-        precomp = [findall(x -> x == string, Precompiled_smiles.SMILES) for string in yes_precompiled]
+        precomp = [findall(x -> x == string, precompiled_smiles_df.SMILES) for string in yes_precompiled]
 
         indices_precomp = vcat(precomp...)
 
-        predicted_class_precomp = Precompiled_smiles[indices_precomp,2]
+        predicted_class_precomp = precompiled_smiles_df[indices_precomp,2]
 
-        predicted_probability_precomp = Precompiled_smiles[indices_precomp,3]
+        predicted_probability_precomp = precompiled_smiles_df[indices_precomp,3]
 
         df_comp =  DataFrame(SMILES = yes_precompiled, Predicted_mobility = predicted_class_precomp, Probability = predicted_probability_precomp)
     end
