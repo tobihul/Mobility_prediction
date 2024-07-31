@@ -1,6 +1,7 @@
+__precompile__()
 module Mobility_prediction
 
-__precompile__()
+
 
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
 using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
@@ -17,9 +18,13 @@ function __init__()
     jl[] = pyimport("joblib")
     pd[] = pyimport("padelpy")
 
-    # Initialize the random forest classifier and precompiled SMILES
-    rf_cl[] = jl[].load("optimized_random_forest_classifier_RepoRT.joblib")
-    Precompiled_smiles[] = CSV.read("Precompiled SMILES.csv", DataFrame)
+    pkg_dir = Base.dirname(@__DIR__)
+    rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT.joblib")
+    csv_path = joinpath(pkg_dir,"Precompiled_SMILES.csv")
+
+    # Load the model and data
+    rf_cl[] = jl[].load(rf_path)
+    Precompiled_smiles[] = CSV.read(csv_path, DataFrame)
 end
 
 # Include your functions file
