@@ -81,5 +81,7 @@ If running a batch and saving as csv:
 
 ## Notes
 
-If you run a Batch file and it is saved as a csv and then run it again with different data but do not change the path, the file will be overwritten.
+* **If you run a Batch file and it is saved as a csv and then run it again with different data but do not change the path, the file will be overwritten.**
+
+* **If any of the SMILES in your list have spelling mistakes or are erroneous in any other way, the calculation will take significantly longer as the batch will run the errored region one-by-one.**
 
