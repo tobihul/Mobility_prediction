@@ -9,10 +9,9 @@ const jl = Ref{PyObject}()
 const pd = Ref{PyObject}()
 
 function __init__()
-    skl = pyimport("sklearn.ensemble")
-    jl = pyimport("joblib")
-    pd = pyimport("padelpy")
-    global skl, jl, pd
+    skl[] = pyimport("sklearn.ensemble")
+    jl[] = pyimport("joblib")
+    pd[] = pyimport("padelpy")
 end
 
 include("All functions.jl")
