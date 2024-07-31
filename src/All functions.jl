@@ -5,9 +5,10 @@ using ScikitLearn: @sk_import
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
 @sk_import model_selection: train_test_split
-Precompiled_smiles = CSV.read("Precompiled SMILES.csv", DataFrame)
-#Load the optimized random forest model
-rf_cl = joblib.load("optimized_random_forest_classifier_RepoRT.joblib")
+
+# You can access `rf_cl` and `Precompiled_smiles` from the main module
+const rf_cl = Mobility_prediction.rf_cl
+const Precompiled_smiles = Mobility_prediction.Precompiled_smiles
 function interpolate_B_modifier(time::Float64, gradient::DataFrame)
     times = gradient[:,1]./run_time
     idx = searchsortedlast(times, time)
