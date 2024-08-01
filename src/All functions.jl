@@ -358,8 +358,14 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
             fingerprints = DataFrame()
             Smiles_list = String[]
             try
+                    if length(not_precompiled) == 1
 
-                pubchem_fp = DataFrame.(pd[].from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+                        pubchem_fp = DataFrame(pd[].from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+
+                    else 
+                        pubchem_fp = DataFrame.(pd[].from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+
+                    end
                 fingerprints = reduce(vcat, pubchem_fp)
                 #If they all succeed the list of smiles simply becomes all of them
                 Smiles_list = not_precompiled
