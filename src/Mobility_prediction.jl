@@ -1,8 +1,6 @@
 __precompile__()
 module Mobility_prediction
 
-
-
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
 using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
 
