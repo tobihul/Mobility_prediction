@@ -360,7 +360,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
             try
                     if length(not_precompiled) == 1
 
-                        pubchem_fp = DataFrame(pd[].from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
+                        pubchem_fp = DataFrame.(pd[].from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
 
                     else 
                         pubchem_fp = DataFrame.(pd[].from_smiles(not_precompiled, fingerprints=true, descriptors = false, timeout = 600, maxruntime = 600))
@@ -371,6 +371,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
                 Smiles_list = not_precompiled
 
             catch
+
 
                 #In case the batch went wrong, do them all individually
                 for j = collect(1:length(not_precompiled))
@@ -450,33 +451,35 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
             end
         end
 
+        if !isempty(Smiles_list)
+            # Extract column names from the DataFrame
+            colnames = names(fingerprints)
 
-        # Extract column names from the DataFrame
-        colnames = names(fingerprints)
+            # Extract the numerical part of the fingerprint column names and sort them since the current order is: FP0, FP1, FP10, FP100, etc.
+            sorted_fingerprint_cols = sort(colnames, by = x -> parse(Int, match(r"\d+", x).match))
 
-        # Extract the numerical part of the fingerprint column names and sort them since the current order is: FP0, FP1, FP10, FP100, etc.
-        sorted_fingerprint_cols = sort(colnames, by = x -> parse(Int, match(r"\d+", x).match))
+            # Reorder the DataFrame
+            ordered_pubchem_fp = select(fingerprints, sorted_fingerprint_cols)
 
-        # Reorder the DataFrame
-        ordered_pubchem_fp = select(fingerprints, sorted_fingerprint_cols)
+            fingerprints = parse.(Int, Matrix(ordered_pubchem_fp))
 
-        fingerprints = parse.(Int, Matrix(ordered_pubchem_fp))
+            #Predict the class
+            predicted_class_not_comp = ScikitLearn.predict(rf_cl[],fingerprints)
 
-        #Predict the class
-        predicted_class_not_comp = ScikitLearn.predict(rf_cl[],fingerprints)
+            #Get the probability
+            predicted_probability_not_comp = vec(Int.(round.(maximum(ScikitLearn.predict_proba(rf_cl[],fingerprints), dims = 2)*100, digits = 0)))
 
-        #Get the probability
-        predicted_probability_not_comp = vec(Int.(round.(maximum(ScikitLearn.predict_proba(rf_cl[],fingerprints), dims = 2)*100, digits = 0)))
+            df_not_comp = DataFrame(SMILES = Smiles_list, Predicted_mobility = predicted_class_not_comp, Probability = predicted_probability_not_comp)
 
-        df_not_comp = DataFrame(SMILES = Smiles_list, Predicted_mobility = predicted_class_not_comp, Probability = predicted_probability_not_comp)
+        end
 
     end
 
-    if length(yes_precompiled) > 0 && length(not_precompiled) > 0
+    if length(yes_precompiled) > 0 && length(Smiles_list) > 0
 
         df_results = vcat(df_comp, df_not_comp)
 
-    elseif length(yes_precompiled) > 0 && length(not_precompiled) == 0
+    elseif length(yes_precompiled) > 0 && length(Smiles_list) == 0
     
         df_results = df_comp
         
