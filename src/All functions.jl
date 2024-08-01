@@ -334,6 +334,8 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
 
     println("$(length(yes_precompiled)) already pre-computed")
     println("$(length(not_precompiled)) need to be manually calculated")
+
+    Smiles_list = String[]
     
     #If there was a match with precomputed smiles, get the mobility from there
     if !isempty(yes_precompiled)
@@ -397,7 +399,6 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
             
             iterations = collect(1:10:length(not_precompiled)) #Split into gorups of 10
             fingerprints = DataFrame()
-            Smiles_list = String[]
             for i in iterations
 
                     if i != iterations[end]
