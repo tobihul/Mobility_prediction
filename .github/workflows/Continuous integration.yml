@@ -23,11 +23,9 @@ jobs:
 
     - name: Install Julia packages
       run: |
-        julia -e 'using Pkg; Pkg.instantiate()'
-
-    - name: Install scikit-learn in Conda
-      run: |
+        julia -e 'using Pkg; Pkg.add("Conda")'
         julia -e 'using Conda; Conda.add("scikit-learn")'
+        julia -e 'using Pkg; Pkg.instantiate()'
 
     - name: Run tests
       run: |
