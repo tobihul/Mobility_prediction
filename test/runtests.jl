@@ -1,3 +1,5 @@
+using Pkg
+Pkg.add(PackageSpec(url="https://github.com/tobihul/Mobility_prediction"))
 using Mobility_prediction
 using Test
 
