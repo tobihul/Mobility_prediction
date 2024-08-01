@@ -12,16 +12,20 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        julia-version: [1.6, 1.7, 1.8, 1.9, 1.10]  # Adjust as needed
+
     steps:
       - uses: actions/checkout@v2
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@v1
         with:
-          version: '1.6'
+          version: ${{ matrix.julia-version }}
 
       - name: Install dependencies
         run: julia -e 'using Pkg; Pkg.instantiate()'
 
       - name: Run tests
-        run: julia -e 'using Pkg; Pkg.test()'
+        run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test()'
