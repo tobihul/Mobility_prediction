@@ -14,7 +14,6 @@ const Precompiled_smiles = Ref{DataFrame}()
 function __init__()
 
     # Activate Conda environment
-    using Conda
     Conda.add("scikit-learn=1.2.2")
     Conda.add("joblib=1.1.0")
    
