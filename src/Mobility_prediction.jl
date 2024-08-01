@@ -4,6 +4,26 @@ module Mobility_prediction
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
 using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
 
+function setup_python_dependencies()
+    # Ensure Conda is installed
+    try
+        @eval using Conda
+    catch
+        println("Installing Conda...")
+        import Pkg
+        Pkg.add("Conda")
+        @eval using Conda
+    end
+
+    # Ensure scikit-learn is installed
+    try
+        pyimport("sklearn")
+    catch
+        println("Installing scikit-learn...")
+        Conda.add("scikit-learn")
+    end
+end
+
 # Declare module-level variables
 const skl = Ref{PyObject}()
 const jl = Ref{PyObject}()
