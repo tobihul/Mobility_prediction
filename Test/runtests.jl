@@ -9,10 +9,17 @@ using Test
     @test smiles_to_mobility("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC") == (["Non-mobile"], 88)
 end
 
+
 SMILES_precomputed = ["CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "CCO", "C1=CC(=C(C=C1CCN)O)O"]
 SMILES_non_precomputed = ["CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", "CCCCCCCCCCCCCCCCCCCCOCCCCCCCCCCCCCCC"]
 SMILES_erroneous = ["CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "C56"]
-#@testset "smiles_to_mobility batch run"
+SMILES_batch = ["CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC",
+"CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC",
+"CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC"]
+SMILES_batch_error = ["CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC",
+"CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC","CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC",
+"CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "C56"]
+@testset "smiles_to_mobility batch run" begin
 
     path = mktempdir()
 
@@ -28,5 +35,20 @@ SMILES_erroneous = ["CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "C56"]
 
     #Test with erroneous SMILES
     result_wrong_smiles = smiles_to_mobility(path, SMILES_erroneous)
-    @test result_non_precomp.Predicted_mobility  == ["Mobile", "Non-mobile","Non-mobile"]
-    @test result_non_precomp.Probability  == [95,88,96]
+    @test result_wrong_smiles.Predicted_mobility  == ["Mobile"]
+    @test result_wrong_smiles.Probability  == [82]
+
+    #Test Batch > 10
+
+    #Test Batch > 10 + 1 not computed
+    result_batch = smiles_to_mobility(path, SMILES_batch)
+    @test result_batch.Predicted_mobility == ["Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile"]
+    @test result_batch.Probability  == [95, 95, 95, 95 ,95, 95, 95, 95, 95, 95, 95]
+
+    #Test batch with wrong smiles 
+
+    result_batch_error = smiles_to_mobility(path, SMILES_batch_error)
+    @test result_batch_error.Predicted_mobility == ["Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile"]
+    @test result_batch_error.Probability  == [95, 95, 95, 95 ,95, 95, 95, 95, 95, 95, 95]
+
+end
