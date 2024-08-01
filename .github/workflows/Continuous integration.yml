@@ -9,26 +9,26 @@ on:
       - main
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        julia-version: [1.10.0]
-
     steps:
-      - uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up Julia
-        uses: julia-actions/setup-julia@v1
-        with:
-          version: ${{ matrix.julia-version }}
+    - name: Set up Julia
+      uses: julia-actions/setup-julia@v1
+      with:
+        julia-version: '1.10.0'
 
-      - name: Install dependencies
-        run: julia -e 'using Pkg; Pkg.instantiate()'
+    - name: Install Julia packages
+      run: |
+        julia -e 'using Pkg; Pkg.instantiate()'
 
-      - name: Add Test dependencies
-        run: julia -e 'using Pkg; Pkg.add("Test")'
+    - name: Install scikit-learn in Conda
+      run: |
+        julia -e 'using Conda; Conda.add("scikit-learn")'
 
-      - name: Run tests
-        run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test()'
+    - name: Run tests
+      run: |
+        julia -e 'using Pkg; Pkg.test()'
