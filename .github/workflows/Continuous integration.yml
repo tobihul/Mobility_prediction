@@ -1,12 +1,7 @@
 name: CompatHelper
-#Compathelper
 on:
   schedule:
-    - cron: 0 0 * * *  # Runs daily at midnight UTC
-  push:
-    branches:
-      - main  # Runs on pushes to the main branch
-  workflow_dispatch:
+    - cron: 0 0 * * *
 
 jobs:
   CompatHelper:

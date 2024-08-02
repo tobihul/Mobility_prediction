@@ -1,0 +1,25 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - main  # Change this to the branch you want to trigger the workflow on
+
+jobs:
+  test:
+    runs-on: windows-latest  # Specify the version of Ubuntu you are using
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v1
+        with:
+          version: '1.10.0'  # Specify the version of Julia you are using
+
+      - name: Install dependencies
+        run: julia -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Run tests
+        run: julia -e 'using Pkg; Pkg.test()'
