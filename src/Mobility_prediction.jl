@@ -14,7 +14,7 @@ const Precompiled_smiles = Ref{DataFrame}()
 function __init__()
 
     # Activate Conda environment
-    Conda.add("scikit-learn=1.2.2")
+    Conda.add("scikit-learn=1.5.1")
    
    # Get the directory of the package source file
     src_dir = dirname(pathof(Mobility_prediction))
