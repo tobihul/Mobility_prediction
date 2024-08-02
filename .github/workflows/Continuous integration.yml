@@ -1,36 +1,27 @@
-name: Continuous integration
+name: CompatHelper
 
 on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+  schedule:
+    - cron: 0 0 * * *
+  workflow_dispatch:
 
 jobs:
-  test:
+  CompatHelper:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-      - name: Set up Julia
+      - name: Install Julia
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.10.0'
 
-      - name: Install dependencies
-        run: julia -e 'using Pkg; Pkg.instantiate()'
+      - name: Add CompatHelper
+        run: julia -e 'using Pkg; Pkg.add("CompatHelper")'
 
-      - name: Configure Python for PyCall
-        run: |
-          python_version=$(python --version | awk '{print $2}')
-          echo "PYTHON=$(which python)" >> $GITHUB_ENV
-          julia -e 'ENV["PYTHON"] = ENV["PYTHON"]; using Pkg; Pkg.build("PyCall")'
-
-      - name: Add Test dependencies
-        run: julia -e 'using Pkg; Pkg.add("Test")'
-
-      - name: Run tests
-        run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test()'
+      - name: Run CompatHelper
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMPATHELPER_PRIV: ${{ secrets.DOCUMENTER_KEY }}
+        run: julia -e 'using CompatHelper; CompatHelper.main()'
