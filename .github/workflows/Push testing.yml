@@ -23,11 +23,5 @@ jobs:
       - name: Install dependencies
         run: julia -e 'using Pkg; Pkg.instantiate()'
 
-      - name: Build PyCall
-        run: julia -e 'using Pkg; Pkg.build("PyCall")'
-
-      - name: Install scikit-learn
-        run: julia -e 'using Conda; Conda.add("scikit-learn")'
-
       - name: Run tests
         run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test()'
