@@ -23,16 +23,14 @@ jobs:
       - name: Install dependencies
         run: julia -e 'using Pkg; Pkg.instantiate()'
 
+      - name: Configure Python for PyCall
+        run: |
+          python_version=$(python --version | awk '{print $2}')
+          echo "PYTHON=$(which python)" >> $GITHUB_ENV
+          julia -e 'ENV["PYTHON"] = ENV["PYTHON"]; using Pkg; Pkg.build("PyCall")'
+
       - name: Add Test dependencies
         run: julia -e 'using Pkg; Pkg.add("Test")'
-
-      - name: Install Conda and Python packages
-        run: |
-          julia -e 'using Pkg; Pkg.add("Conda")'
-          julia -e 'using Conda; Conda.add("scikit-learn")'
-
-      - name: Configure PyCall
-        run: julia -e 'ENV["PYTHON"] = ""; using Pkg; Pkg.build("PyCall")'
 
       - name: Run tests
         run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test()'
