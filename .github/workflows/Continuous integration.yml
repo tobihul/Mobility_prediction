@@ -12,7 +12,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-
     steps:
       - uses: actions/checkout@v2
 
@@ -26,6 +25,14 @@ jobs:
 
       - name: Add Test dependencies
         run: julia -e 'using Pkg; Pkg.add("Test")'
+
+      - name: Install Conda and Python packages
+        run: |
+          julia -e 'using Pkg; Pkg.add("Conda")'
+          julia -e 'using Conda; Conda.add("scikit-learn")'
+
+      - name: Configure PyCall
+        run: julia -e 'ENV["PYTHON"] = ""; using Pkg; Pkg.build("PyCall")'
 
       - name: Run tests
         run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test()'
