@@ -41,7 +41,7 @@ function __init__()
 end
 
 # Include your functions file
-include("All functions.jl")
+include("smiles_to_mobility.jl")
 
 
 export smiles_to_mobility
