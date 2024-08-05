@@ -1,3 +1,5 @@
+name: Continuous integration
+
 on:
   push:
     branches:
@@ -10,17 +12,31 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
-
     steps:
       - uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install scikit-learn
 
       - name: Set up Julia
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.10.0'
 
-      - name: Install dependencies
+      - name: Install Julia dependencies
         run: julia -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Rebuild PyCall with the correct Python
+        env:
+          PYTHON: /opt/hostedtoolcache/Python/3.11.9/x64/bin/python3
+        run: julia -e 'ENV["PYTHON"] = ENV["PYTHON"]; Pkg.build("PyCall")'
 
       - name: Add Test dependencies
         run: julia -e 'using Pkg; Pkg.add("Test")'
