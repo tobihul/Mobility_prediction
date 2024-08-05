@@ -21,10 +21,6 @@ Conda.pip("install", ["joblib"], Conda.ROOTENV)
 
 Conda.pip("install", ["padelpy"], Conda.ROOTENV)
 
-Pkg.build("PyCall") 
-
-
-
 function __init__()
 
     Conda.add("scikit-learn=1.5.1")
