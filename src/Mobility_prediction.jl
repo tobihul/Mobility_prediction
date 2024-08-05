@@ -31,7 +31,13 @@ end
 
 function __init__()
 
-    Conda.add("scikit-learn=1.5.1")
+    try
+        readdir("$(Conda.ROOTENV)\\pkgs\\scikit-learn-1.5.1-py310hf2a6c47_0")  # Check if Java is already installed
+    catch
+        println("Scikitlearn version not found installing 1.5.1...")
+        Conda.add("scikit-learn=1.5.1")
+    end
+    
    
    # Get the directory of the package source file
     src_dir = dirname(pathof(Mobility_prediction))
