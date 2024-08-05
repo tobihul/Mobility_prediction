@@ -11,6 +11,7 @@ const pd = Ref{PyObject}()
 const rf_cl = Ref{Any}()
 const Precompiled_smiles = Ref{DataFrame}()
 
+using Pkg
 function setup_environment()
     ENV["PYTHON"] = ""  # Ensure PyCall uses Conda's Python
     Conda.pip_interop(true, Conda.ROOTENV)  # Enable pip interop in Conda root environment
@@ -20,11 +21,9 @@ function setup_environment()
 
     # Install each package if not already installed
     for pkg in required_packages
-        try
-            run(`$(Conda.ROOTENV)/bin/pip show $pkg`)  # Check if package is already installed
-        catch
-            Conda.pip("install", [pkg], Conda.ROOTENV)  # Install package if not found
-        end
+       
+        Conda.pip("install", [pkg], Conda.ROOTENV) 
+        
     end
 
     Pkg.build("PyCall")  # Rebuild PyCall to use the newly installed packages
@@ -32,7 +31,6 @@ end
 
 function __init__()
 
-    # Activate Conda environment
     Conda.add("scikit-learn=1.5.1")
    
    # Get the directory of the package source file
@@ -59,10 +57,10 @@ function __init__()
     Precompiled_smiles[] = CSV.read(csv_path, DataFrame)
 end
 
-# Include your functions file
+
 include("smiles_to_mobility.jl")
 
 
 export smiles_to_mobility
 
-end # module Mobility_prediction
+end 
