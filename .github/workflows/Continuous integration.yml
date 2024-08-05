@@ -1,25 +1,29 @@
-name: CompatHelper
 on:
-  schedule:
-    - cron: 0 0 * * *
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  CompatHelper:
+  test:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
 
-      - name: Install Julia
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Julia
         uses: julia-actions/setup-julia@v1
         with:
           version: '1.10.0'
 
-      - name: Add CompatHelper
-        run: julia -e 'using Pkg; Pkg.add("CompatHelper")'
+      - name: Install dependencies
+        run: julia -e 'using Pkg; Pkg.instantiate()'
 
-      - name: Run CompatHelper
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COMPATHELPER_PRIV: ${{ secrets.DOCUMENTER_KEY }}
-        run: julia -e 'using CompatHelper; CompatHelper.main()'
+      - name: Add Test dependencies
+        run: julia -e 'using Pkg; Pkg.add("Test")'
+
+      - name: Run tests
+        run: julia -e 'using Pkg; Pkg.activate("."); Pkg.test()'
