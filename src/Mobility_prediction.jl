@@ -11,16 +11,17 @@ const pd = Ref{PyObject}()
 const rf_cl = Ref{Any}()
 const Precompiled_smiles = Ref{DataFrame}()
 
+using Conda
 
-ENV["PYTHON"] = ""  # Ensure PyCall uses Conda's Python
-Conda.pip_interop(true, Conda.ROOTENV)  # Enable pip interop in Conda root environment
+ENV["PYTHON"] = ""  
 
-# List of required Python packages
-required_packages = ["joblib", "padelpy"]
+Conda.pip_interop(true, Conda.ROOTENV)  
 
-Conda.pip("install", [required_packages], Conda.ROOTENV)
+Conda.pip("install", ["joblib"], Conda.ROOTENV)
 
-Pkg.build("PyCall")  # Rebuild PyCall to use the newly installed packages
+Conda.pip("install", ["padelpy"], Conda.ROOTENV)
+
+Pkg.build("PyCall") 
 
 
 
