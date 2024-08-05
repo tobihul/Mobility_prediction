@@ -1,7 +1,6 @@
 using CSV, DataFrames, PyCall, Statistics, LinearAlgebra, Conda
 
 
-
 function smiles_to_mobility(SMILES::String)
     #test
     precompiled_smiles_df = Precompiled_smiles[]
