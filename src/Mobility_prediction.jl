@@ -21,6 +21,14 @@ Conda.pip("install", ["joblib"], Conda.ROOTENV)
 
 Conda.pip("install", ["padelpy"], Conda.ROOTENV)
 
+try
+    run(`java -version`)  # Check if Java is already installed
+catch
+    println("Java not found. Installing OpenJDK...")
+    Conda.add("openjdk")
+end
+
+
 function __init__()
 
     Conda.add("scikit-learn=1.5.1")
