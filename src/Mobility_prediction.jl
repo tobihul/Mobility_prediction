@@ -1,11 +1,10 @@
 __precompile__(true)
 module Mobility_prediction
 
-using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
-using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
+using CSV, Statistics, DataFrames, LinearAlgebra, ScikitLearn, Random
+using PyCall, Conda
 
-# Declare module-level variables
-const skl = Ref{PyObject}()
+
 const jl = Ref{PyObject}()
 const pd = Ref{PyObject}()
 const rf_cl = Ref{Any}()
@@ -39,22 +38,21 @@ function __init__()
     end
     
    
-   # Get the directory of the package source file
+   
     src_dir = dirname(pathof(Mobility_prediction))
     
-    # Go up one level to get the root directory of the package
+    
     pkg_dir = dirname(src_dir)
 
-    # Construct paths to files in the root directory
+    
     rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT.joblib")
     csv_path = joinpath(pkg_dir, "Precompiled SMILES.csv")
 
-    # Print paths for debugging
+    
     println("Random Forest path: $rf_path")
     println("CSV path: $csv_path")
 
-    # Import necessary modules
-    skl[] = pyimport("sklearn.ensemble")
+   
     jl[] = pyimport("joblib")
     pd[] = pyimport("padelpy")
 
