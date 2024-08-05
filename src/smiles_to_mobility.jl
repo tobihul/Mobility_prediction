@@ -1,4 +1,4 @@
-using CSV, DataFrames, PyCall, Statistics, LinearAlgebra, Conda
+using CSV, DataFrames, PyCall, Statistics, LinearAlgebra, Conda, ScikitLearn
 
 
 function smiles_to_mobility(SMILES::String)
