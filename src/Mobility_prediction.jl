@@ -11,7 +11,6 @@ const pd = Ref{PyObject}()
 const rf_cl = Ref{Any}()
 const Precompiled_smiles = Ref{DataFrame}()
 
-using Pkg
 function setup_environment()
     ENV["PYTHON"] = ""  # Ensure PyCall uses Conda's Python
     Conda.pip_interop(true, Conda.ROOTENV)  # Enable pip interop in Conda root environment
