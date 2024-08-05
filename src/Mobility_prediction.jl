@@ -1,4 +1,4 @@
-__precompile__()
+__precompile__(true)
 module Mobility_prediction
 
 using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
@@ -11,22 +11,18 @@ const pd = Ref{PyObject}()
 const rf_cl = Ref{Any}()
 const Precompiled_smiles = Ref{DataFrame}()
 
-function setup_environment()
-    ENV["PYTHON"] = ""  # Ensure PyCall uses Conda's Python
-    Conda.pip_interop(true, Conda.ROOTENV)  # Enable pip interop in Conda root environment
 
-    # List of required Python packages
-    required_packages = ["joblib", "padelpy"]
+ENV["PYTHON"] = ""  # Ensure PyCall uses Conda's Python
+Conda.pip_interop(true, Conda.ROOTENV)  # Enable pip interop in Conda root environment
 
-    # Install each package if not already installed
-    for pkg in required_packages
-       
-        Conda.pip("install", [pkg], Conda.ROOTENV) 
-        
-    end
+# List of required Python packages
+required_packages = ["joblib", "padelpy"]
 
-    Pkg.build("PyCall")  # Rebuild PyCall to use the newly installed packages
-end
+Conda.pip("install", [required_packages], Conda.ROOTENV)
+
+Pkg.build("PyCall")  # Rebuild PyCall to use the newly installed packages
+
+
 
 function __init__()
 
