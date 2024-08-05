@@ -36,7 +36,7 @@ jobs:
       - name: Rebuild PyCall with the correct Python
         env:
           PYTHON: /opt/hostedtoolcache/Python/3.11.9/x64/bin/python3
-        run: julia -e 'ENV["PYTHON"] = ENV["PYTHON"]; Pkg.build("PyCall")'
+        run: julia -e 'using Pkg; ENV["PYTHON"] = ENV["PYTHON"]; Pkg.build("PyCall")'
 
       - name: Add Test dependencies
         run: julia -e 'using Pkg; Pkg.add("Test")'
