@@ -100,5 +100,5 @@ annotate!(p[4], 0.1, 14000, text("d)", :left, 18))
 
 ######Applicability Domain
 cd("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\Plots")
-savefig("Important variables all RepoRT.png")
-cd("R:\\PHD2024TH-Q6813\\Code\\Regression")
+savefig("log D conf index.png")
+cd("R:\\PHD2024TH-Q6813\\Code\\Mobility prediction")
