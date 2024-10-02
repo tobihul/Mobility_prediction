@@ -2,14 +2,14 @@ using CSV, Statistics, DataFrames, PubChemCrawler, StatsPlots
 using LinearAlgebra, ScikitLearn, Random, MLJ, PyCall, Conda
 using ScikitLearn: @sk_import
 
+joblib = pyimport("joblib")
+np = pyimport("numpy")
+sklearn = pyimport("sklearn")
 @sk_import ensemble: RandomForestClassifier
 @sk_import model_selection: StratifiedKFold
 @sk_import model_selection: train_test_split
 
-# You can access `rf_cl` and `Precompiled_smiles` from the main module
-const rf_cl = Mobility_prediction.rf_cl
-const Precompiled_smiles = Mobility_prediction.Precompiled_smiles
-const pd = Mobility_prediction.pd
+
 function interpolate_B_modifier(time::Float64, gradient::DataFrame)
     times = gradient[:,1]./run_time
     idx = searchsortedlast(times, time)

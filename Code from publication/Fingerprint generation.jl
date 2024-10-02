@@ -41,6 +41,7 @@ REACH_data = CSV.read("R:\\PHD2024TH-Q6813\\Models and other documents\\REACH201
 
 REACH_smiles = sum(ismissing.(REACH_data.SMILES))
 
+unique(REACH_data[:,12])
 
 
 @time PubChem_df = smiles_to_FPS(REACH_smiles)
