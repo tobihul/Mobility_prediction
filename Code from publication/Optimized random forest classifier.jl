@@ -102,7 +102,7 @@ CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\List of PubChem FPs 
 #This is used to take a look at specific cases of misclassifications. Change y_test and y_hat_test as needed with: "Very mobile, Mobile or Non-Mobile
 indices = []
 for i in eachindex(y_test)
-    if y_test[i] == "Non-mobile" && y_hat_test[i] == "Mobile"
+    if y_test[i] == "Mobile" && y_hat_test[i] == "Very mobile"
         push!(indices, i)
     end
 end
@@ -112,6 +112,7 @@ cmp_indices = test_indices[indices]
 
 probas = proba_test[indices]
 mean(probas)
+std(probas)
 #Their organic modifier
 p_bs = filtered_RPLC_data.Modifier[cmp_indices]
 
