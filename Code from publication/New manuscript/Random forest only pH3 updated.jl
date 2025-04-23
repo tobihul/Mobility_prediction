@@ -31,7 +31,7 @@ ScikitLearn.fit!(rf_cl, X_train, y_train)
 
 RandomForestClassifier = sklearn.ensemble.RandomForestClassifier
 
-joblib.dump(rf_cl, "optimized_random_forest_classifier_RepoRT_improved pH3 and 2.6.joblib", compress = 5)
+joblib.dump(rf_cl, "optimized_random_forest_classifier_RepoRT_improved pH3 and 2.6 final.joblib", compress = 5)
 
 ############################################
 ##If you just want to use the model already trained start hyperparameter
