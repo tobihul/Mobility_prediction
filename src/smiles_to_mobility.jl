@@ -265,9 +265,5 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
     return df_results
 
 end
-smiles_to_mobility("CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC")
-smiles_to_mobility(path, SMILES_precomputed) 
-SMILES = SMILES_precomputed
-path = mktempdir()
 export smiles_to_mobility
 
