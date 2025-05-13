@@ -31,10 +31,10 @@ end
 function __init__()
 
     try
-        readdir("$(Conda.ROOTENV)\\pkgs\\scikit-learn-1.5.1-py310hf2a6c47_0")  # Check if Java is already installed
+        readdir("$(Conda.ROOTENV)\\pkgs\\scikit-learn-1.6.1-py310hf2a6c47_0") 
     catch
-        println("Scikitlearn version not found installing 1.5.1...")
-        Conda.add("scikit-learn=1.5.1")
+        println("Scikitlearn version not found installing 1.6.1...")
+        Conda.add("scikit-learn=1.6.1")
     end
     
    
@@ -45,8 +45,8 @@ function __init__()
     pkg_dir = dirname(src_dir)
 
     
-    rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT.joblib")
-    csv_path = joinpath(pkg_dir, "Precompiled SMILES.csv")
+    rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT_improved pH3 and 2.6 final.joblib")
+    csv_path = joinpath(pkg_dir, "Precompiled SMILES new.csv")
 
     
     println("Random Forest path: $rf_path")

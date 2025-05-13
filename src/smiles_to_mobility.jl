@@ -110,7 +110,7 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
     #If there was a match with precomputed smiles, get the mobility from there
     if !isempty(yes_precompiled)
         #Find the indices of the precomputed ones
-        precomp = [findall(x -> x == string, precompiled_smiles_df.SMILES) for string in yes_precompiled]
+        precomp = [findfirst(x -> x == string, precompiled_smiles_df.SMILES) for string in yes_precompiled]
 
         indices_precomp = vcat(precomp...)
 
@@ -265,6 +265,5 @@ function smiles_to_mobility(path::String,SMILES::Vector{String})
     return df_results
 
 end
-
 export smiles_to_mobility
 
