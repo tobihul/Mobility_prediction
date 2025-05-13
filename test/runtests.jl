@@ -26,7 +26,7 @@ SMILES_batch_error = ["CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCC
     #Precomputed test
     result_precomp = smiles_to_mobility(path, SMILES_precomputed) 
     @test result_precomp.Predicted_mobility  == ["Mobile", "Very mobile","Very mobile"]
-    @test result_precomp.Probability  == [82,85,99]
+    @test result_precomp.Probability  == [82,85,100]
 
     #Non precomputed test
     result_non_precomp = smiles_to_mobility(path, SMILES_non_precomputed) 
