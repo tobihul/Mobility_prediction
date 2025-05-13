@@ -72,7 +72,7 @@ predicted_class = ScikitLearn.predict(rf_cl,All_FPs)
 
 probas = ScikitLearn.predict_proba(rf_cl,All_FPs)
 
-predicted_probability = vec(maximum(probas, dims=2))
+predicted_probability = Int.(round.(vec(maximum(probas, dims=2)).*100, digits = 0))
 
 Precompiled_SMILES = DataFrame(SMILES = All_smiles, Predicted_class = predicted_class,
 Probability = predicted_probability)

@@ -4,7 +4,7 @@ using Test
 #Test data 
 @testset "smiles_to_mobility single" begin
     ##Test a single run already pre-compiled
-    @test smiles_to_mobility("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") == ("Very mobile", 90)
+    @test smiles_to_mobility("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") == ("Mobile", 82)
     ##Test a single run that needs to be calculated
     @test smiles_to_mobility("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC") == (["Non-mobile"], 93)
 end
@@ -25,8 +25,8 @@ SMILES_batch_error = ["CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCC
 
     #Precomputed test
     result_precomp = smiles_to_mobility(path, SMILES_precomputed) 
-    @test result_precomp.Predicted_mobility  == ["Very mobile", "Very mobile","Very mobile"]
-    @test result_precomp.Probability  == [90,90,90]
+    @test result_precomp.Predicted_mobility  == ["Mobile", "Very mobile","Very mobile"]
+    @test result_precomp.Probability  == [82,85,99]
 
     #Non precomputed test
     result_non_precomp = smiles_to_mobility(path, SMILES_non_precomputed) 
@@ -35,8 +35,8 @@ SMILES_batch_error = ["CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCC
 
     #Test with erroneous SMILES
     result_wrong_smiles = smiles_to_mobility(path, SMILES_erroneous)
-    @test result_wrong_smiles.Predicted_mobility  == ["Very mobile"]
-    @test result_wrong_smiles.Probability  == [90]
+    @test result_wrong_smiles.Predicted_mobility  == ["Mobile"]
+    @test result_wrong_smiles.Probability  == [82]
 
     #Test Batch > 10
 
