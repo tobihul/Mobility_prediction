@@ -5,6 +5,9 @@ fingerprints = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobili
 fingerprints = Matrix(fingerprints)
 PubChem_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\PubChem keys.txt")
 
+
+sum(RPLC_pH3_pH26_data.Modifier .<= 5)
+
 X_train, X_test, y_train, y_test, train_indices, test_indices, y = train_test_split_no_leakage_classifier(RPLC_pH3_pH26_data, 0.1, fingerprints)
 
 
@@ -117,7 +120,7 @@ savefig("Plots\\Important variables.png")
 #This is used to take a look at specific cases of misclassifications. Change y_test and y_hat_test as needed with: "Very mobile, Mobile or Non-Mobile
 indices = []
 for i in eachindex(y_test)
-    if y_test[i] == "Non-mobile" && y_hat_test[i] == "Very mobile"
+    if y_test[i] == "Non-mobile" && y_hat_test[i] == "Non-mobile"
         push!(indices, i)
     end
 end
@@ -126,23 +129,40 @@ end
 cmp_indices = test_indices[indices]
 
 # Get the corresponding rows from the original filtered_RPLC_data
-misclassified_samples = RPLC_pH3_pH26_data[cmp_indices, :][3,:].SMILES
+search = rand(collect(1:length(cmp_indices)))
 
-probas = proba_test[indices]
-mean(probas)
+
+misclassified_samples = RPLC_pH3_pH26_data[cmp_indices, :][search,:].InChi
+SMILES = RPLC_pH3_pH26_data[cmp_indices, :][search,:].SMILES
+probas = mean(proba_test[indices])
+
 #Their organic modifier
-p_bs = RPLC_pH3_pH26_data.Modifier[cmp_indices][3]
+cmps = findall(x-> x == misclassified_samples,  RPLC_pH3_pH26_data.InChi)
+mod = RPLC_pH3_pH26_data.Modifier[cmps]
+sum(mod.<=60)
+means = mean(RPLC_pH3_pH26_data.Modifier[cmps]./100)
+stds = std(RPLC_pH3_pH26_data.Modifier[cmps]./100)
 
-inchis = RPLC_pH3_pH26_data.InChi[cmp_indices][3]
-inchi_test = "InChI=1S/C10H12N2O/c1-13-9-4-2-3-8-10(9)7(5-11)6-12-8/h2-4,6,12H,5,11H2,1H3"
+MW = RPLC_pH3_pH26_data.MW[cmps][1]
+XlogP = RPLC_pH3_pH26_data.XlogP[cmps][1]
+
+
+
+
+
+inchis = RPLC_pH3_pH26_data.InChi[cmp_indices][5]
+inchi_test = "InChI=1S/C8HF15O2/c9-2(10,1(24)25)3(11,12)4(13,14)5(15,16)6(17,18)7(19,20)8(21,22)23/h(H,24,25)"
 times_in = findall(x-> x == inchi_test, RPLC_pH3_pH26_data.InChi[cmp_indices])
-times_in_two = findall(x-> x == inchi_test, RPLC_pH3_pH26_data.InChi[test_indices])
 using StatsBase
 
 
 
 #Back to original data>
-cmps = findall(x-> x == inchis,  RPLC_pH3_pH26_data.InChi)
+cmps = findall(x-> x == "InChI=1S/C10H17N3O6S/c11-5(10(18)19)1-2-7(14)13-6(4-20)9(17)12-3-8(15)16/h5-6,20H,1-4,11H2,(H,12,17)(H,13,14)(H,15,16)(H,18,19)/t5-,6-/m0/s1",  RPLC_pH3_pH26_data.InChi[test_indices])
+Mods = RPLC_pH3_pH26_data.Modifier[test_indices][cmps]
+mean(Mods)
+std(Mods)
+cmps = findall(x-> x == inchi_test,  RPLC_pH3_pH26_data.InChi)
 
 means = mean(RPLC_pH3_pH26_data.Modifier[cmps]./100)
 stds = std(RPLC_pH3_pH26_data.Modifier[cmps]./100)
@@ -153,13 +173,13 @@ XlogP = RPLC_pH3_pH26_data.XlogP[cmps][1]
  scatter(RPLC_pH3_pH26_data.Modifier[cmps]./100)
 
  # Step 1: Identify misclassified test indices
-misclassified_indices = [i for i in eachindex(y_test) if y_test[i] == "Very mobile" && y_hat_test[i] == "Non-mobile"]
+misclassified_indices = [i for i in eachindex(y_test) if y_test[i] == "Non-mobile" && y_hat_test[i] == "Very mobile"]
 
 # Step 2: Map back to the full dataset
 cmp_indices = test_indices[misclassified_indices]
 
 # Step 3: Get the InChI of misclassified compounds
-misclassified_inchis = RPLC_pH3_pH26_data.InChi[cmp_indices][2]
+misclassified_inchis = RPLC_pH3_pH26_data.InChi[cmp_indices]
 
 # Step 4: Count how many times each InChI appears in the test set
 test_inchis = RPLC_pH3_pH26_data.InChi[test_indices]

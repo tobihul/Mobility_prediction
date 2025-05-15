@@ -1,14 +1,16 @@
 include("All functions.jl")
 using EvoTrees
 #Random forest modelling after performing hyperparameter optimization using hyperparameter optimization.jl
-RPLC_pH3_pH26_data = CSV.read("C:\\Users\\uqthulle\\Documents\\RPLC_data_pH3and2.6_updated.csv", DataFrame)
-fingerprints = CSV.read("C:\\Users\\uqthulle\\Documents\\pH 3 and 2.6 RepoRT fingerprints final.csv", DataFrame)
+RPLC_pH3_pH26_data = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobility model\\RPLC_data_pH3and2.6_updated.csv", DataFrame)
+fingerprints = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobility model\\pH 3 and 2.6 RepoRT fingerprints final.csv", DataFrame)
 fingerprints = Matrix(fingerprints)
 PubChem_keys = readlines( "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\PubChem keys.txt")
 
 #Splitting data into train and test by avoiding data leakage
 
-X_train, X_test, y_train, y_test, train_indices, test_indices, y = train_test_split_no_leakage_classifier(RPLC_pH3_data, 0.1, fingerprints)
+X_train, X_test, y_train, y_test, train_indices, test_indices, y = train_test_split_no_leakage_classifier(RPLC_pH3_pH26_data, 0.1, fingerprints)
+
+#Obtaining eval set
 
 X_train, X_eval, y_train, y_eval, train_indices, eval_indices, y = train_test_split_no_leakage_classifier(RPLC_pH3_pH26_data[train_indices,:], 0.111, fingerprints[train_indices,:])
 
@@ -17,28 +19,27 @@ x_train = X_train
 #Build the model with the optimal settings using EvoTrees
 using EvoTrees: fit
 
-#category_map = Dict("Mobile" => 1, "Non-mobile" => 2, "Very mobile" => 3)
-#y_train = [category_map[x] for x in y_train]
-#cat_y_test = [category_map[x] for x in y_test]
 
 config = EvoTreeClassifier(
     early_stopping_rounds = 10,
-    nrounds = 50,
+    nrounds = 100,
     eta = 0.1,
     L2 = 0.1,
-    lambda = 0.1,
+    lambda = 0,
     gamma = 0.1,
-    max_depth = 5,
-    min_weight = 1,
-    rowsample = 1,
-    colsample = 1,
-    nbins = 64,
+    max_depth = 12,
+    min_weight = 10,
+    rowsample = 0.7,
+    colsample = 0.5,
+    nbins = 32,
     rng = 1,
     device = :cpu
 
 )
-x_train = X_train
+
 @time model = EvoTrees.fit_evotree(config; x_train, y_train, feature_names = PubChem_keys)
+
+#Plotting the tree
 plot(model,2)
 #Prediction of train and test
 y_hat_train_probas = EvoTrees.predict(model, x_train)

@@ -1,8 +1,7 @@
 include("All functions.jl")
 using YAML
 #Import the raw data from the RepoRT dataset
-folder_path = "C:\\Users\\uqthulle\\Downloads\\RepoRT updated 08042025\\raw_data"
-
+folder_path = "R:\\PHD2024TH-Q6813\\Research files\\RepoRT updated 08042025\\raw_data"
 expected_columns =  ["flowrate"
 "id"
 "length"
@@ -17,7 +16,7 @@ Mode_table = Vector{String}()
 
 for i = 1:length(readdir(folder_path))
     @show i
-    current_file_raw = joinpath("C:\\Users\\uqthulle\\Downloads\\RepoRT updated 08042025\\raw_data", readdir(folder_path)[i])
+    current_file_raw = joinpath("R:\\PHD2024TH-Q6813\\Research files\\RepoRT updated 08042025\\raw_data", readdir(folder_path)[i])
     
     info_path = joinpath(current_file_raw, join(["$(readdir(folder_path)[1:end][i])", "info.tsv"],"_"))
     info = CSV.read(info_path, DataFrame)

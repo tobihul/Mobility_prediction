@@ -3,7 +3,6 @@ include("All functions.jl")
 ###Load in the REACH data
 REACH_data = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Models and other documents\\REACH fingerprints final.csv", DataFrame)
 
-unique(REACH_data.canonicalsmiles)
 ###Looking at the data distribution
 MW_REACH = histogram(REACH_data.mw,  
 linecolor=:transparent,

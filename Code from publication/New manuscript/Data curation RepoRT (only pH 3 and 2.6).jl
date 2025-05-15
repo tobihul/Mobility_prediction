@@ -1,15 +1,7 @@
 include("All functions.jl")
-#Check the file All funtions.jl for all the specific functions written for this file
-
-#Import the raw data from the RepoRT dataset
-#folder_path = "C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Documents\\RepoRT-master\\raw_data"
 
 #Import the updated raw data
-#folder_path = "C:\\Users\\uqthulle\\Downloads\\RepoRT updated 08042025\\raw_data"
 folder_path = "R:\\PHD2024TH-Q6813\\Research files\\RepoRT updated 08042025\\raw_data"
-
-
-
 
 Final_table = DataFrame(SMILES = String[], InChi = String[], LC_mode = String7[], Column_name = String[], CID = String[], Retention_factors = Float64[], Modifier = Float64[], pH = Float64[])
 
@@ -220,31 +212,3 @@ REACH_ordered_df = select(REACH_data, sorted_colnames)
 ##Save the ordered DataFrame
 CSV.write("R:\\PHD2024TH-Q6813\\Models and other documents\\REACH fingerprints final.csv", REACH_ordered_df)
 
-#REACH data
-REACH_data = CSV.read("C:\\Users\\uqthulle\\OneDrive - The University of Queensland\\Finerprints\\REACH SMILES and FPS.csv", DataFrame)
-RPLC_pH3_data = CSV.read("C:\\Users\\uqthulle\\Documents\\RPLC_data_pH3.csv", DataFrame)
-
-# Elements in RPLC_pH3_data that are NOT in REACH_data
-diff_elements = setdiff(RPLC_pH3_data[:,1], REACH_data[:,1])
-
-# Create a new DataFrame with only these elements
-RPLC_no_REACH = RPLC_pH3_data[in.(RPLC_pH3_data[:,1], Ref(diff_elements)), :]
-CSV.write("C:\\Users\\uqthulle\\Documents\\RPLC_no_REACH.csv", RPLC_no_REACH)
-
-common_elements = intersect(RPLC_pH3_data[:,1], REACH_data[:,1])
-
-# Create a new DataFrame with only these elements
-RPLC_with_REACH = RPLC_pH3_data[in.(RPLC_pH3_data[:,1], Ref(common_elements)), :]
-CSV.write("C:\\Users\\uqthulle\\Documents\\RPLC_with_REACH.csv", RPLC_with_REACH)
-
-intersect(RPLC_no_REACH[:,1], RPLC_with_REACH[:,1])
-
-###Original set to pH 3 using dictionary
-RPLC_pH3_data = CSV.read("C:\\Users\\uqthulle\\Documents\\RPLC_data_pH3.csv", DataFrame)
-original_RPLC_no_pH = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Models and other documents\\filtered_RPLC_data.csv", DataFrame)
-
-ph_dict = Dict(row.SMILES => row.pH for row in eachrow(Final_table))
-
-
-original_RPLC_no_pH.pH = get.(Ref(ph_dict), original_RPLC_no_pH.SMILES, missing)
-original_RPLC_no_pH

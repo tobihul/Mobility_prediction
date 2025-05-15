@@ -9,8 +9,7 @@ xlabel = "Entry n", ylabel = "Retention factor / Φ", label = "Φ")
 scatter!(RPLC_data[nd_entries,end-1], label = "Retention factor")
 
 #Plot to show excluded data_compounds
-scatter((RPLC_pH3_pH26_data.Modifier./100),
- (RPLC_pH3_pH26_data.Retention_factors), label = false,
+scatter((RPLC_pH3_pH26_data.Modifier./100),RPLC_pH3_pH26_data.Retention_factors, label = false,
 dpi = 300, xlabel = "Φ", ylabel = "Retention factor", 
 xlims = (0,1), ylims = (0,1.6), legend = :topleft)
 plot!([0.1, 0.1], [0.7, 1], c = :red, ls = :dash, label = "excluded")

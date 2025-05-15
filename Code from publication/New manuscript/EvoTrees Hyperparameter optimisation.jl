@@ -74,7 +74,7 @@ function evaluate_model(config, x_train, y_train, x_eval, y_eval; max_retries=5)
             println(" ⚠️ Error in evaluation (Attempt $retries/$max_retries): $(e)")
             if retries >= max_retries
                 println(" ❌ Skipping this trial after $max_retries failed attempts.\n")
-                return nothing, nothing, nothing, nothing  # Return safe values
+                return nothing, nothing, nothing, nothing  
             end
             
         end
