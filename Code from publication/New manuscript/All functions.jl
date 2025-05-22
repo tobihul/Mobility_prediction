@@ -61,7 +61,7 @@ function remove_missing_and_outliers(Results_unique)
     return Results_unique
 end
 function TPR_FDR(c_matrix)
-    #c_matrix= ConfusionMatrices.matrix(c_matrix)
+    c_matrix= ConfusionMatrices.matrix(c_matrix)
     TP_M = c_matrix[1,1]
     FN_M = c_matrix[2,1] + c_matrix[3,1]
     FP_M = c_matrix[1,2] + c_matrix[1,3]
@@ -91,40 +91,32 @@ function TPR_FDR(c_matrix)
 
     return df
 end
-function train_test_split_no_leakage_classifier(filtered_RPLC_data, split, fingerprints)
-   
+function train_test_split_no_leakage_classifier(data::DataFrame, split::Float64, fingerprints::Matrix)
+    # Step 1: Identify unique compounds and their majority class
+    unique_compounds = unique(data.SMILES)
+    y = data.Class
 
-    unique_compounds = unique(filtered_RPLC_data.InChi)
+    # Step 2: Get majority labels (already done outside)
+    first_labels = strat_labels(unique_compounds, data.SMILES, y)
 
-    p_b = filtered_RPLC_data.Modifier./100
+    # Step 3: Stratified train/test split
+    train, test = train_test_split(unique_compounds, test_size=split, stratify=first_labels, random_state = 42, shuffle=true)
 
-    y = assign_labels(p_b)
-
-    first_labels = strat_labels(unique_compounds,filtered_RPLC_data.InChi, y)
-    
-    train, test = train_test_split(unique_compounds, test_size = split, random_state = 42, stratify = first_labels, shuffle = true)
-    
-    # Initialize variables
-    train_indices = []
-    test_indices = []
-
-    # Find indices for train and test data
-    @time for i in eachindex(unique_compounds)
-        if (i % 100) == 0
-            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
-        end
-        occurrences = findall(x -> x == unique_compounds[i], filtered_RPLC_data.InChi)
-        if unique_compounds[i] in train
-            append!(train_indices, occurrences)
-        else
-            append!(test_indices, occurrences)
-        end
+    # Step 4: Map SMILES to indices
+    compound_to_indices = Dict{String, Vector{Int}}()
+    for (i, smiles) in pairs(data.SMILES)
+        push!(get!(compound_to_indices, smiles, Int[]), i)
     end
+
+    # Step 5: Collect train/test indices
+    train_indices = vcat([compound_to_indices[smiles] for smiles in train]...)
+    test_indices = vcat([compound_to_indices[smiles] for smiles in test]...)
+
+    # Step 6: Shuffle and extract data
     Random.seed!(42)
-     # Shuffle the indices
-     shuffle!(train_indices)
-     shuffle!(test_indices)
-    # Extract train and test data
+    shuffle!(train_indices)
+    shuffle!(test_indices)
+
     X_train = fingerprints[train_indices, :]
     X_test = fingerprints[test_indices, :]
     y_train = y[train_indices]
@@ -146,44 +138,51 @@ function assign_labels(Φ)
     return y
 end
 function strat_labels(unique_vector, original_data, labels)
+    # Map each unique value in original_data to its first index
+    first_occurrence = Dict{eltype(original_data), Int}()
+    for (i, val) in pairs(original_data)
+        if !haskey(first_occurrence, val)
+            first_occurrence[val] = i
+        end
+    end
 
+    # Use the dictionary to quickly get first indices for unique_vector
     index_first_occurrence = Vector{Int}(undef, length(unique_vector))
-
     for i in eachindex(unique_vector)
-
         if (i % 100) == 0
             println("$(round(i/length(unique_vector)*100, digits = 2))%")
         end
-        index_first_occurrence[i] = findfirst(x-> x == unique_vector[i],original_data)
-
+        index_first_occurrence[i] = first_occurrence[unique_vector[i]]
     end
 
-    strat_labels = labels[index_first_occurrence]
-    return strat_labels
+    return labels[index_first_occurrence]
 end
 function remove_outliers_IQR(RPLC_data)
     unique_compounds = unique(RPLC_data.SMILES)
+    smiles_col = RPLC_data.SMILES
 
     non_outliers = []
-    for i in eachindex(unique_compounds)
+
+    for (i, compound) in enumerate(unique_compounds)
         if i % 100 == 0
-            println("$(round(i/length(unique_compounds)*100, digits = 2))%")
+            println("$(round(i / length(unique_compounds) * 100, digits = 2))%")
         end
 
-        occurrences = findall(x-> x == unique_compounds[i],RPLC_data.SMILES)
-        group = RPLC_data.Modifier[occurrences]./100
+        occurrences = findall(x -> x == compound, smiles_col)
+        group = RPLC_data.Modifier[occurrences] ./ 100
+
         Q1 = quantile(group, 0.25)
         Q3 = quantile(group, 0.75)
         IQR = Q3 - Q1
+
         lower_bound = Q1 - 1.5 * IQR
         upper_bound = Q3 + 1.5 * IQR
+
         indices_non_outliers = occurrences[(group .>= lower_bound) .& (group .<= upper_bound)]
         append!(non_outliers, indices_non_outliers)
     end
 
-    filtered_RPLC_data = RPLC_data[non_outliers,:]
-
-    return filtered_RPLC_data
+    return RPLC_data[non_outliers, :]
 end
 function remove_missing_identifiers(RPLC_data)      
     InChI = RPLC_data.InChi
@@ -208,31 +207,47 @@ function remove_missing_identifiers(RPLC_data)
     
     return RPLC_data
 end
-function append_occurrences_folds(unique_train::Vector{String}, fold::Int)
+function append_occurrences_folds(unique_train::Vector{String}, fold::Int, train_indices::Vector{Int})
     train_set = Set(unique_train[train_fold[fold]])
-    # Initialize variables
-    train_indices_fold = Int[]
-    test_indices_fold = Int[]
 
-    # Find indices for train and test data
-    @time for i in eachindex(unique_train)
+    # Map from SMILES to global indices in merged_data (subset of train_indices)
+    SMILES_to_indices = Dict{String, Vector{Int}}()
+    for i in train_indices
+        SMILES = merged_data.SMILES[i]
+        push!(get!(SMILES_to_indices, SMILES, Int[]), i)
+    end
+
+    # Map from global index to local index in train_indices
+    global_to_local = Dict{Int, Int}()
+    for (local_idx, global_idx) in enumerate(train_indices)
+        global_to_local[global_idx] = local_idx
+    end
+
+    train_indices_fold_local = Int[]
+    test_indices_fold_local = Int[]
+
+    for (i, compound) in enumerate(unique_train)
         if (i % 10) == 0
-            println("$(round(i/length(unique_train)*100, digits = 2))%")
+            println("$(round(i / length(unique_train) * 100, digits=2))%")
         end
-        occurrences = findall(x -> x == unique_train[i], filtered_RPLC_data.InChi[train_indices])
-        if unique_train[i] in train_set
-            append!(test_indices_fold, occurrences)
+
+        indices_global = get(SMILES_to_indices, compound, Int[])
+
+        # Convert to local indices and skip if not found (shouldn't happen if consistent)
+        indices_local = [global_to_local[idx] for idx in indices_global if haskey(global_to_local, idx)]
+
+        if compound in train_set
+            append!(test_indices_fold_local, indices_local)
         else
-            append!(train_indices_fold, occurrences)
+            append!(train_indices_fold_local, indices_local)
         end
     end
 
-    shuffle!(train_indices_fold)
-    shuffle!(test_indices_fold)
-    return train_indices_fold, test_indices_fold
+    shuffle!(train_indices_fold_local)
+    shuffle!(test_indices_fold_local)
 
+    return train_indices_fold_local, test_indices_fold_local
 end
-
 export interpolate_B_modifier, calculate_leverage, remove_missing_and_outliers, TPR_FDR, 
 train_test_split_no_leakage_classifier, assign_labels, strat_labels, remove_outliers_IQR, remove_missing_identifiers,
 append_occurrences_folds

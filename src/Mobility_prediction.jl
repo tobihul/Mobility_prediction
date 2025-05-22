@@ -45,7 +45,7 @@ function __init__()
     pkg_dir = dirname(src_dir)
 
     
-    rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT_improved pH3 and 2.6 final.joblib")
+    rf_path = joinpath(pkg_dir, "optimized_random_forest_classifier_RepoRT_improved and merged pH3 and 2.6 final.joblib")
     csv_path = joinpath(pkg_dir, "Precompiled SMILES new.csv")
 
     

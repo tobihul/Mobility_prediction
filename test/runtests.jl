@@ -4,7 +4,7 @@ using Test
 #Test data 
 @testset "smiles_to_mobility single" begin
     ##Test a single run already pre-compiled
-    @test smiles_to_mobility("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") == ("Mobile", 82)
+    @test smiles_to_mobility("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") == ("Mobile", 99)
     ##Test a single run that needs to be calculated
     @test smiles_to_mobility("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC") == (["Non-mobile"], 93)
 end

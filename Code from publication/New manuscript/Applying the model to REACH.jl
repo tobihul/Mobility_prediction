@@ -32,7 +32,7 @@ plot(MW_REACH, XlogP_REACH, size = (800,600), dpi = 300)
 REACH_fingerprints =Matrix(REACH_data[:,4:end])
 
 #Load the optimized random forest model
-rf_class = joblib.load("optimized_random_forest_classifier_RepoRT_improved pH3 and 2.6 final.joblib")
+rf_class = joblib.load("optimized_random_forest_classifier_RepoRT_improved and merged pH3 and 2.6 final.joblib")
 
 #Predict the classes
 REACH_mobility_classes = ScikitLearn.predict(rf_class,REACH_fingerprints)
@@ -376,3 +376,18 @@ indices
 real_indices = vec(OPERA_mols[indices,:])
 
 REACH_data[real_indices,1][20]
+
+
+scatter(REACH_data.mw[OPERA_mols], REACH_data.xlogp[OPERA_mols], zcolor = OPERA_logKoc)
+
+very_mobile = findall(x-> x== "Very mobile",REACH_mobility_classes)
+mobile = findall(x-> x== "Mobile",REACH_mobility_classes)
+non_mobile = findall(x-> x== "Non-mobile",REACH_mobility_classes)
+
+
+scatter(REACH_data.mw[non_mobile], REACH_data.xlogp[non_mobile], c = :green, label = "Non-mobile", alpha = 1,  markerstrokewidth = 0,
+dpi = 300, xlabel = "MW", ylabel = "XlogP")
+scatter!(REACH_data.mw[mobile], REACH_data.xlogp[mobile], c = :darkorange1, label = "Mobile", alpha = 0.5,  markerstrokewidth = 0)
+scatter!(REACH_data.mw[very_mobile], REACH_data.xlogp[very_mobile], c = :red, label = "Very mobile", alpha = 0.1,  markerstrokewidth = 0)
+
+savefig("R:\\PHD2024TH-Q6813\\Research Files\\Models and other documents\\RECH mobility plot.png")

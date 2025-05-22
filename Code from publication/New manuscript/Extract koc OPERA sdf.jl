@@ -1,4 +1,4 @@
-read(sdf_file)
+
 sdf_file = "C:\\Users\\uqthulle\\Downloads\\S1\\OPERA_KOC\\TR_KOC_545.txt"
 sdf_file_2 = "C:\\Users\\uqthulle\\Downloads\\S1\\OPERA_KOC\\TST_KOC_184.txt"
 
@@ -52,8 +52,8 @@ using PyCall
 @pyimport sklearn
 println("scikit-learn version: ", sklearn.__version__)
 
-RepoRT_data = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobility model\\RPLC_data_pH3and2.6_updated.csv", DataFrame)
-RepoRT_FP = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobility model\\pH 3 and 2.6 RepoRT fingerprints final.csv", DataFrame)
+RepoRT_data = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobility model\\merged_expanded_RPLC_pH3_data.csv", DataFrame)
+RepoRT_FP = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobility model\\merged_expanded_entries_FPS.csv", DataFrame)
 REACH_FP = CSV.read("R:\\PHD2024TH-Q6813\\Research files\\Code\\Final Mobility model\\REACH fingerprints final.csv", DataFrame)
 
 SMILES_RepoRT = RepoRT_data.SMILES
@@ -66,7 +66,7 @@ All_FPs = Matrix(All_FP_data)
 
 All_smiles = vcat(SMILES_RepoRT, SMILES_REACH)
 
-rf_cl = joblib.load("optimized_random_forest_classifier_RepoRT_improved pH3 and 2.6 final.joblib")
+rf_cl = joblib.load("optimized_random_forest_classifier_RepoRT_improved and merged pH3 and 2.6 final.joblib")
 
 predicted_class = ScikitLearn.predict(rf_cl,All_FPs)
 
@@ -91,7 +91,7 @@ kocs = (df_final[:,2][indices_OPERA])
 
 using GLM
 
-scatter(kocs, modifers)
+scatter(kocs, modifiers)
 
 df = DataFrame(kocs = kocs, modifers = modifiers./100)
 
