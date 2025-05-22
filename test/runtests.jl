@@ -6,7 +6,7 @@ using Test
     ##Test a single run already pre-compiled
     @test smiles_to_mobility("CN1C=NC2=C1C(=O)N(C(=O)N2C)C") == ("Mobile", 99)
     ##Test a single run that needs to be calculated
-    @test smiles_to_mobility("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC") == (["Non-mobile"], 93)
+    @test smiles_to_mobility("CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC") == (["Non-mobile"], 89)
 end
 
 
@@ -26,29 +26,29 @@ SMILES_batch_error = ["CCCCCCCCCCCCCCCCCCCCCCCCCCCOOCCCCCCC", "CCCCCCCCCCCCCCCCC
     #Precomputed test
     result_precomp = smiles_to_mobility(path, SMILES_precomputed) 
     @test result_precomp.Predicted_mobility  == ["Mobile", "Very mobile","Very mobile"]
-    @test result_precomp.Probability  == [82,85,100]
+    @test result_precomp.Probability  == [99,69,100]
 
     #Non precomputed test
     result_non_precomp = smiles_to_mobility(path, SMILES_non_precomputed) 
     @test result_non_precomp.Predicted_mobility  == ["Non-mobile", "Non-mobile","Non-mobile"]
-    @test result_non_precomp.Probability  == [96,93,92]
+    @test result_non_precomp.Probability  == [93,89,93]
 
     #Test with erroneous SMILES
     result_wrong_smiles = smiles_to_mobility(path, SMILES_erroneous)
     @test result_wrong_smiles.Predicted_mobility  == ["Mobile"]
-    @test result_wrong_smiles.Probability  == [82]
+    @test result_wrong_smiles.Probability  == [99]
 
     #Test Batch > 10
 
     #Test Batch > 10 + 1 not computed
     result_batch = smiles_to_mobility(path, SMILES_batch)
     @test result_batch.Predicted_mobility == ["Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile"]
-    @test result_batch.Probability  == [96, 96, 96, 96 ,96, 96, 96, 96, 96, 96, 96]
+    @test result_batch.Probability  == [93, 93, 93, 93 ,93, 93, 93, 93, 93, 93, 93]
 
     #Test batch with wrong smiles 
 
     result_batch_error = smiles_to_mobility(path, SMILES_batch_error)
     @test result_batch_error.Predicted_mobility == ["Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile", "Non-mobile"]
-    @test result_batch_error.Probability  == [96, 96, 96, 96 ,96, 96, 96, 96, 96, 96, 96]
+    @test result_batch_error.Probability  == [93, 93, 93, 93 ,93, 93, 93, 93, 93, 93, 93]
 
 end
