@@ -87,3 +87,11 @@ If running a batch and saving as csv:
 
 * **If any of the SMILES in your list have spelling mistakes or are erroneous in any other way, the calculation will take significantly longer as the batch will run the errored region one-by-one.**
 
+### Application to all RepoRT entries and REACH dataset chemicals n = 207,000+
+
+The model was applied to all unique SMILES found both in the RepoRT dataset and all unique smiles in the REACH dataset. In the figure below the distribution of all chemicals in the MW and XlogP space can be seen grouped by predicted mobility class.
+
+<p align="center">
+  <img src="Precompiled FPS plot.png" alt="Plot description" width="600"/>
+</p>
+
