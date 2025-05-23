@@ -1,6 +1,6 @@
 # Mobility_prediction.jl
 
-**Mobility_prediction.jl** is a tool that can be used to obtain the predicted mobility of any chemical. For more than 150,000 unqiue SMILES, the fingerprints have already been pre-computed. If your query chemicals are included, the tool should be almost instant. If they are not it may take some time to calculate the fingerprints depending on your hardware.
+**Mobility_prediction.jl** is a tool that can be used to obtain the predicted mobility of any chemical. For more than 200,000 unqiue SMILES, the fingerprints have already been pre-computed. If your query chemicals are included, the tool should be almost instant. If they are not it may take some time to calculate the fingerprints depending on your hardware.
 
 ## Installation
 
