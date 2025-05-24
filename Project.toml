@@ -24,6 +24,7 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
+BinaryProvider = "0.5"
 CSV = "0.10"
 Conda = "1"
 DataFrames = "1"
