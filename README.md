@@ -2,6 +2,8 @@
 
 **Mobility_prediction.jl** is a tool that can be used to obtain the predicted mobility of any chemical. For more than 200,000 unqiue SMILES, the fingerprints have already been pre-computed. If your query chemicals are included, the tool should be almost instant. If they are not it may take some time to calculate the fingerprints depending on your hardware.
 
+To read more about how it works: https://pubs.acs.org/doi/10.1021/acs.est.5c07274
+
 ## Installation
 
 In order to install the **LC_MS_Resolved_Peaks.jl** package in Julia, run the follwing: "]" to enter package manager and then "add https://github.com/tobihul/Mobility_prediction"
